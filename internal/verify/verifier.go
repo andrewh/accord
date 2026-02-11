@@ -127,33 +127,19 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 
 // compareBody recursively compares expected and actual body fields.
 func compareBody(result *Result, expected, actual any, rules contract.MatchingRules, path string) {
-	expectedMap, isMap := expected.(map[string]any)
-	if !isMap {
-		// Scalar or array comparison at this level
-		rulePath := "$." + path
-		rule, hasRule := rules[rulePath]
-		if hasRule {
-			if err := contract.ApplyRule(rule, expected, actual); err != nil {
-				result.Failures = append(result.Failures, Failure{
-					Field:    path,
-					Expected: fmt.Sprintf("%v", expected),
-					Actual:   fmt.Sprintf("%v", actual),
-					Message:  err.Error(),
-				})
-			}
-		} else if err := contract.MatchExact(expected, actual); err != nil {
-			result.Failures = append(result.Failures, Failure{
-				Field:    path,
-				Expected: fmt.Sprintf("%v", expected),
-				Actual:   fmt.Sprintf("%v", actual),
-				Message:  err.Error(),
-			})
-		}
-		return
+	switch expectedTyped := expected.(type) {
+	case map[string]any:
+		compareBodyMap(result, expectedTyped, actual, rules, path)
+	case []any:
+		compareBodyArray(result, expectedTyped, actual, rules, path)
+	default:
+		compareBodyScalar(result, expected, actual, rules, path)
 	}
+}
 
-	actualMap, isActualMap := actual.(map[string]any)
-	if !isActualMap {
+func compareBodyMap(result *Result, expectedMap map[string]any, actual any, rules contract.MatchingRules, path string) {
+	actualMap, ok := actual.(map[string]any)
+	if !ok {
 		result.Failures = append(result.Failures, Failure{
 			Field:    path,
 			Expected: "object",
@@ -188,19 +174,58 @@ func compareBody(result *Result, expected, actual any, rules contract.MatchingRu
 				})
 			}
 		} else {
-			// Recurse for nested objects, exact match for scalars
-			_, isNestedMap := expectedVal.(map[string]any)
-			if isNestedMap {
-				compareBody(result, expectedVal, actualVal, rules, fieldPath)
-			} else if err := contract.MatchExact(expectedVal, actualVal); err != nil {
-				result.Failures = append(result.Failures, Failure{
-					Field:    fieldPath,
-					Expected: fmt.Sprintf("%v", expectedVal),
-					Actual:   fmt.Sprintf("%v", actualVal),
-					Message:  err.Error(),
-				})
-			}
+			compareBody(result, expectedVal, actualVal, rules, fieldPath)
 		}
+	}
+}
+
+func compareBodyArray(result *Result, expectedArr []any, actual any, rules contract.MatchingRules, path string) {
+	actualArr, ok := actual.([]any)
+	if !ok {
+		result.Failures = append(result.Failures, Failure{
+			Field:    path,
+			Expected: "array",
+			Actual:   fmt.Sprintf("%T", actual),
+			Message:  "expected array, got different type",
+		})
+		return
+	}
+
+	if len(expectedArr) != len(actualArr) {
+		result.Failures = append(result.Failures, Failure{
+			Field:    path,
+			Expected: fmt.Sprintf("array of length %d", len(expectedArr)),
+			Actual:   fmt.Sprintf("array of length %d", len(actualArr)),
+			Message:  "array length mismatch",
+		})
+		return
+	}
+
+	for i := range expectedArr {
+		elemPath := fmt.Sprintf("%s[%d]", path, i)
+		compareBody(result, expectedArr[i], actualArr[i], rules, elemPath)
+	}
+}
+
+func compareBodyScalar(result *Result, expected, actual any, rules contract.MatchingRules, path string) {
+	rulePath := "$." + path
+	rule, hasRule := rules[rulePath]
+	if hasRule {
+		if err := contract.ApplyRule(rule, expected, actual); err != nil {
+			result.Failures = append(result.Failures, Failure{
+				Field:    path,
+				Expected: fmt.Sprintf("%v", expected),
+				Actual:   fmt.Sprintf("%v", actual),
+				Message:  err.Error(),
+			})
+		}
+	} else if err := contract.MatchExact(expected, actual); err != nil {
+		result.Failures = append(result.Failures, Failure{
+			Field:    path,
+			Expected: fmt.Sprintf("%v", expected),
+			Actual:   fmt.Sprintf("%v", actual),
+			Message:  err.Error(),
+		})
 	}
 }
 

@@ -386,3 +386,210 @@ func TestVerifyMultipleInteractions(t *testing.T) {
 		}
 	}
 }
+
+func TestVerifyArrayExactMatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"tags": []any{"go", "testing"},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "get tags",
+				Request:     contract.Request{Method: "GET", Path: "/tags"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"tags": []any{"go", "testing"},
+					},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if !results[0].Passed {
+		t.Errorf("expected pass, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestVerifyArrayLengthMismatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"tags": []any{"go"},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "get tags",
+				Request:     contract.Request{Method: "GET", Path: "/tags"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"tags": []any{"go", "testing"},
+					},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if results[0].Passed {
+		t.Error("expected failure for array length mismatch")
+	}
+}
+
+func TestVerifyArrayTypeMismatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"tags": "not-an-array",
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "get tags",
+				Request:     contract.Request{Method: "GET", Path: "/tags"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"tags": []any{"go"},
+					},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if results[0].Passed {
+		t.Error("expected failure for type mismatch (string vs array)")
+	}
+}
+
+func TestVerifyNestedArrayObjects(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"users": []any{
+				map[string]any{"name": "Alice", "email": "alice@test.com"},
+				map[string]any{"name": "Bob", "email": "bob@test.com"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "list users",
+				Request:     contract.Request{Method: "GET", Path: "/users"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"users": []any{
+							map[string]any{"name": "Alice", "email": "alice@test.com"},
+							map[string]any{"name": "Bob", "email": "bob@test.com"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if !results[0].Passed {
+		t.Errorf("expected pass, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestVerifyArrayElementMatchingRule(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"users": []any{
+				map[string]any{"name": "DifferentName", "email": "someone@test.com"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "list users with type matching",
+				Request:     contract.Request{Method: "GET", Path: "/users"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"users": []any{
+							map[string]any{"name": "Alice", "email": "alice@test.com"},
+						},
+					},
+				},
+				MatchingRules: contract.MatchingRules{
+					"$.body.users[0].name":  {Match: "type"},
+					"$.body.users[0].email": {Match: "regex", Regex: "^[^@]+@[^@]+$"},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if !results[0].Passed {
+		t.Errorf("expected pass with element matching rules, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestVerifyArrayElementFailurePath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"items": []any{"actual_a", "actual_b"},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "check items",
+				Request:     contract.Request{Method: "GET", Path: "/items"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"items": []any{"expected_a", "expected_b"},
+					},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if results[0].Passed {
+		t.Error("expected failure for element mismatch")
+	}
+	// Failure paths should reference individual elements
+	for _, f := range results[0].Failures {
+		if f.Field == "body.items[0]" || f.Field == "body.items[1]" {
+			return // found element-level path
+		}
+	}
+	t.Errorf("expected element-level failure paths (body.items[0] or body.items[1]), got: %v", results[0].Failures)
+}
