@@ -675,6 +675,32 @@ func TestSeverityMixedFails(t *testing.T) {
 	}
 }
 
+func TestSendRequestMetrics(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	req := contract.Request{Method: "GET", Path: "/health"}
+	metrics, err := sendRequest(req, server.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if metrics.Response == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if metrics.Response.StatusCode != 200 {
+		t.Errorf("status = %d, want 200", metrics.Response.StatusCode)
+	}
+	if metrics.RoundTripMs < 0 {
+		t.Errorf("RoundTripMs = %d, want >= 0", metrics.RoundTripMs)
+	}
+	if metrics.TimeToFirstByteMs < 0 {
+		t.Errorf("TimeToFirstByteMs = %d, want >= 0", metrics.TimeToFirstByteMs)
+	}
+}
+
 func TestSeverityZeroValueIsError(t *testing.T) {
 	f := Failure{Field: "status", Message: "mismatch"}
 	if f.Severity != SeverityError {

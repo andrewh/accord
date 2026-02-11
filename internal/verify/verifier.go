@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/andrewh/accord/internal/contract"
 )
@@ -66,7 +68,7 @@ func Verify(c *contract.Contract, providerURL string) []Result {
 func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 	result := Result{Interaction: ix.Description}
 
-	resp, err := sendRequest(ix.Request, providerURL)
+	metrics, err := sendRequest(ix.Request, providerURL)
 	if err != nil {
 		result.Failures = append(result.Failures, Failure{
 			Field:   "request",
@@ -74,6 +76,7 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		})
 		return result
 	}
+	resp := metrics.Response
 	defer resp.Body.Close()
 
 	// Compare status
@@ -122,24 +125,25 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		}
 	}
 
+	// Read response body (needed for both body comparison and NFR byte count)
+	bodyBytes, bodyErr := io.ReadAll(resp.Body)
+	if bodyErr != nil {
+		result.Failures = append(result.Failures, Failure{
+			Field:   "body",
+			Message: fmt.Sprintf("failed to read response body: %v", bodyErr),
+		})
+	}
+
 	// Compare body
-	if ix.Response.Body != nil {
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
+	if ix.Response.Body != nil && bodyErr == nil {
+		var actualBody any
+		if err := json.Unmarshal(bodyBytes, &actualBody); err != nil {
 			result.Failures = append(result.Failures, Failure{
 				Field:   "body",
-				Message: fmt.Sprintf("failed to read response body: %v", err),
+				Message: fmt.Sprintf("failed to parse response body as JSON: %v", err),
 			})
 		} else {
-			var actualBody any
-			if err := json.Unmarshal(bodyBytes, &actualBody); err != nil {
-				result.Failures = append(result.Failures, Failure{
-					Field:   "body",
-					Message: fmt.Sprintf("failed to parse response body as JSON: %v", err),
-				})
-			} else {
-				compareBody(&result, ix.Response.Body, actualBody, ix.MatchingRules, "body")
-			}
+			compareBody(&result, ix.Response.Body, actualBody, ix.MatchingRules, "body")
 		}
 	}
 
@@ -272,7 +276,14 @@ func compareBodyScalar(result *Result, expected, actual any, rules contract.Matc
 	}
 }
 
-func sendRequest(req contract.Request, providerURL string) (*http.Response, error) {
+// RequestMetrics holds the HTTP response and timing measurements.
+type RequestMetrics struct {
+	Response          *http.Response
+	RoundTripMs       int64
+	TimeToFirstByteMs int64
+}
+
+func sendRequest(req contract.Request, providerURL string) (*RequestMetrics, error) {
 	fullURL := strings.TrimRight(providerURL, "/") + req.Path
 
 	if len(req.Query) > 0 {
@@ -305,5 +316,24 @@ func sendRequest(req contract.Request, providerURL string) (*http.Response, erro
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
 
-	return http.DefaultClient.Do(httpReq)
+	var ttfb time.Duration
+	start := time.Now()
+	trace := &httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			ttfb = time.Since(start)
+		},
+	}
+	httpReq = httpReq.WithContext(httptrace.WithClientTrace(httpReq.Context(), trace))
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+
+	roundTrip := time.Since(start)
+	return &RequestMetrics{
+		Response:          resp,
+		RoundTripMs:       roundTrip.Milliseconds(),
+		TimeToFirstByteMs: ttfb.Milliseconds(),
+	}, nil
 }
