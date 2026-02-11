@@ -27,6 +27,20 @@ type Interaction struct {
 	Request       Request       `yaml:"request"`
 	Response      Response      `yaml:"response"`
 	MatchingRules MatchingRules `yaml:"matching_rules"`
+	NFR           *NFR          `yaml:"nfr,omitempty"`
+}
+
+// NFRThreshold defines a not-to-exceed value with optional severity.
+type NFRThreshold struct {
+	Threshold int    `yaml:"threshold"`
+	Severity  string `yaml:"severity,omitempty"`
+}
+
+// NFR holds non-functional requirement thresholds for an interaction.
+type NFR struct {
+	MaxResponseBytes     *NFRThreshold `yaml:"max_response_bytes,omitempty"`
+	MaxTimeToFirstByteMs *NFRThreshold `yaml:"max_time_to_first_byte_ms,omitempty"`
+	MaxRoundTripMs       *NFRThreshold `yaml:"max_round_trip_ms,omitempty"`
 }
 
 // Request describes the HTTP request to send.
