@@ -1,6 +1,8 @@
 # Accord
 
-File-based contract testing. Consumer-driven contracts using plain YAML files, distributed through existing mechanisms (git, CI artifacts, package registries). Zero external dependencies in CI - just a single binary and contract files.
+Simple Contract Testing at Scale.
+
+Consumer-driven contracts using plain YAML files, distributed through existing mechanisms (git, CI artifacts, package registries). Zero external dependencies in CI - just a single binary and contract files.
 
 ## Installation
 
