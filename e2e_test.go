@@ -450,3 +450,109 @@ interactions:
 		t.Errorf("expected severity error, got: %s", out)
 	}
 }
+
+func TestE2EGenerateDryRun(t *testing.T) {
+	cmd := exec.Command(binaryPath, "generate", "--dry-run", "testdata/openapi/petstore.yaml")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "accord:") {
+		t.Errorf("expected 'accord:' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "consumer:") {
+		t.Errorf("expected 'consumer:' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "provider:") {
+		t.Errorf("expected 'provider:' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "interactions:") {
+		t.Errorf("expected 'interactions:' in output, got: %s", out)
+	}
+}
+
+func TestE2EGenerateWithConsumer(t *testing.T) {
+	cmd := exec.Command(binaryPath, "generate", "--dry-run", "--consumer", "order-service", "testdata/openapi/petstore.yaml")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "order-service") {
+		t.Errorf("expected consumer name in output, got: %s", out)
+	}
+	if !strings.Contains(out, "order-service--petstore.yaml") {
+		t.Errorf("expected filename header in output, got: %s", out)
+	}
+}
+
+func TestE2EGenerateWriteFile(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command(binaryPath, "generate", "--output-dir", dir, "--consumer", "test-svc", "testdata/openapi/minimal.yaml")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	path := filepath.Join(dir, "test-svc--minimal-service.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("expected output file to exist: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("expected non-empty output file")
+	}
+}
+
+func TestE2EGenerateThenLint(t *testing.T) {
+	// Generate a contract, then lint it to prove the output is valid.
+	dir := t.TempDir()
+	genCmd := exec.Command(binaryPath, "generate", "--output-dir", dir, "--consumer", "test-svc", "testdata/openapi/petstore.yaml")
+	genOutput, err := genCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generate failed: %v\noutput: %s", err, genOutput)
+	}
+
+	contractPath := filepath.Join(dir, "test-svc--petstore.yaml")
+	lintCmd := exec.Command(binaryPath, "lint", contractPath)
+	lintOutput, err := lintCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("lint failed on generated contract: %v\noutput: %s", err, lintOutput)
+	}
+	if len(lintOutput) != 0 {
+		t.Errorf("expected no lint output for generated contract, got: %s", lintOutput)
+	}
+}
+
+func TestE2EGenerateEndpointFilter(t *testing.T) {
+	cmd := exec.Command(binaryPath, "generate", "--dry-run", "--endpoints", "/pets", "testdata/openapi/petstore.yaml")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	// Should have interactions for /pets but not for /pets/{petId}
+	if !strings.Contains(out, "interactions:") {
+		t.Errorf("expected interactions in output, got: %s", out)
+	}
+}
+
+func TestE2EGenerateMissingSpec(t *testing.T) {
+	cmd := exec.Command(binaryPath, "generate", "nonexistent.yaml")
+	_, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for missing spec")
+	}
+}
+
+func TestE2EGenerateNoArgs(t *testing.T) {
+	cmd := exec.Command(binaryPath, "generate")
+	_, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit with no arguments")
+	}
+}

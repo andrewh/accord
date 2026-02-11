@@ -54,17 +54,14 @@ func TestGenerateEndpointFilter(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	c := contracts[0]
-	// Should match GET /pets and POST /pets but not /pets/{petId} or /pets/{petId}/health
+	// Should match GET /pets and POST /pets but not /pets/{petId} or /pets/{petId}/health.
 	for _, ix := range c.Contract.Interactions {
-		if strings.Contains(ix.Request.Path, "/") && ix.Request.Path != "/pets" {
-			// Path params get substituted, so check the original interaction.
-			// The description will still contain the method and original path info.
-		}
-	}
-	// Verify that endpoints with subpaths are excluded.
-	for _, ix := range c.Contract.Interactions {
-		if strings.Contains(ix.Description, "health") || strings.Contains(ix.Description, "Health") {
+		desc := strings.ToLower(ix.Description)
+		if strings.Contains(desc, "health") {
 			t.Error("expected /pets/{petId}/health to be filtered out")
+		}
+		if strings.Contains(desc, "by id") || strings.Contains(desc, "pet by") {
+			t.Error("expected /pets/{petId} to be filtered out")
 		}
 	}
 }

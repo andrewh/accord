@@ -77,9 +77,7 @@ func convertSpec(doc *openapi3.T) *Spec {
 
 	for _, path := range paths {
 		item := doc.Paths.Map()[path]
-		for _, methodOp := range methodOperations(path, item) {
-			spec.Endpoints = append(spec.Endpoints, methodOp)
-		}
+		spec.Endpoints = append(spec.Endpoints, methodOperations(path, item)...)
 	}
 
 	return spec
