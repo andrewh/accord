@@ -593,3 +593,87 @@ func TestVerifyArrayElementFailurePath(t *testing.T) {
 	}
 	t.Errorf("expected element-level failure paths (body.items[0] or body.items[1]), got: %v", results[0].Failures)
 }
+
+func TestVerifyWildcardMatchingRule(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"users": []any{
+				map[string]any{"name": "Xavier", "email": "x@test.com"},
+				map[string]any{"name": "Yolanda", "email": "y@test.com"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "list users with wildcard rules",
+				Request:     contract.Request{Method: "GET", Path: "/users"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"users": []any{
+							map[string]any{"name": "Alice", "email": "alice@test.com"},
+							map[string]any{"name": "Bob", "email": "bob@test.com"},
+						},
+					},
+				},
+				MatchingRules: contract.MatchingRules{
+					"$.body.users[*].name":  {Match: "type"},
+					"$.body.users[*].email": {Match: "regex", Regex: "^[^@]+@[^@]+$"},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if !results[0].Passed {
+		t.Errorf("expected pass with wildcard matching rules, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestVerifySpecificIndexOverridesWildcard(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"items": []any{
+				map[string]any{"id": 42},
+				map[string]any{"id": 99},
+			},
+		})
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "specific index overrides wildcard",
+				Request:     contract.Request{Method: "GET", Path: "/items"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"items": []any{
+							map[string]any{"id": 42},
+							map[string]any{"id": 1},
+						},
+					},
+				},
+				MatchingRules: contract.MatchingRules{
+					"$.body.items[*].id": {Match: "type"},
+					"$.body.items[0].id": {Match: "exact"}, // specific index takes priority
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	// items[0].id should use exact (42 == 42, pass)
+	// items[1].id should use wildcard type (99 is number like 1, pass)
+	if !results[0].Passed {
+		t.Errorf("expected pass, got failures: %v", results[0].Failures)
+	}
+}

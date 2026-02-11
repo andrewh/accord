@@ -8,10 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/andrewh/accord/internal/contract"
 )
+
+var indexPattern = regexp.MustCompile(`\[\d+\]`)
 
 // Result holds the outcome of verifying a single interaction.
 type Result struct {
@@ -125,6 +128,27 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 	return result
 }
 
+// indexToWildcard replaces numeric array indices with wildcards in a path.
+// e.g. "$.body.users[0].email" -> "$.body.users[*].email"
+func indexToWildcard(path string) string {
+	return indexPattern.ReplaceAllString(path, "[*]")
+}
+
+// lookupRule finds a matching rule for a path, falling back to a wildcard
+// variant if no exact match exists. Specific indices take priority.
+func lookupRule(rules contract.MatchingRules, path string) (contract.MatchingRule, bool) {
+	if rule, ok := rules[path]; ok {
+		return rule, true
+	}
+	wildcard := indexToWildcard(path)
+	if wildcard != path {
+		if rule, ok := rules[wildcard]; ok {
+			return rule, true
+		}
+	}
+	return contract.MatchingRule{}, false
+}
+
 // compareBody recursively compares expected and actual body fields.
 func compareBody(result *Result, expected, actual any, rules contract.MatchingRules, path string) {
 	switch expectedTyped := expected.(type) {
@@ -163,7 +187,7 @@ func compareBodyMap(result *Result, expectedMap map[string]any, actual any, rule
 		}
 
 		rulePath := "$." + fieldPath
-		rule, hasRule := rules[rulePath]
+		rule, hasRule := lookupRule(rules, rulePath)
 		if hasRule {
 			if err := contract.ApplyRule(rule, expectedVal, actualVal); err != nil {
 				result.Failures = append(result.Failures, Failure{
@@ -209,7 +233,7 @@ func compareBodyArray(result *Result, expectedArr []any, actual any, rules contr
 
 func compareBodyScalar(result *Result, expected, actual any, rules contract.MatchingRules, path string) {
 	rulePath := "$." + path
-	rule, hasRule := rules[rulePath]
+	rule, hasRule := lookupRule(rules, rulePath)
 	if hasRule {
 		if err := contract.ApplyRule(rule, expected, actual); err != nil {
 			result.Failures = append(result.Failures, Failure{
