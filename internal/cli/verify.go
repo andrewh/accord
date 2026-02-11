@@ -42,12 +42,23 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 		results := verify.Verify(c, providerURL)
 		for _, r := range results {
-			if r.Passed {
+			hasWarnings := len(r.Failures) > 0 && r.Passed
+			switch {
+			case r.Passed && !hasWarnings:
 				fmt.Printf("  PASS  %s\n", r.Interaction)
-			} else {
+			case r.Passed && hasWarnings:
+				fmt.Printf("  WARN  %s\n", r.Interaction)
+				for _, f := range r.Failures {
+					fmt.Printf("        [warning] %s\n", f)
+				}
+			default:
 				fmt.Printf("  FAIL  %s\n", r.Interaction)
 				for _, f := range r.Failures {
-					fmt.Printf("        %s\n", f)
+					if f.Severity == verify.SeverityWarning {
+						fmt.Printf("        [warning] %s\n", f)
+					} else {
+						fmt.Printf("        %s\n", f)
+					}
 				}
 				hasFailures = true
 			}
