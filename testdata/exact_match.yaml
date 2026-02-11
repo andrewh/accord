@@ -1,0 +1,21 @@
+accord: "0.1"
+
+consumer:
+  name: "strict-client"
+
+provider:
+  name: "user-service"
+
+interactions:
+  - description: "get a specific user"
+    request:
+      method: GET
+      path: /users/123
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        id: 123
+        name: "Jane Doe"
+        email: "jane@example.com"
