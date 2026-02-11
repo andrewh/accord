@@ -2,6 +2,7 @@
 package contract
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -25,6 +26,7 @@ func TestResolvePath(t *testing.T) {
 		{"$.body.address.city", body, "London", false},
 		{"$.body.missing", body, nil, true},
 		{"$.body.address.missing", body, nil, true},
+		{"$.body.id", 42, nil, true}, // non-map body with plain segment
 	}
 
 	for _, tt := range tests {
@@ -43,6 +45,62 @@ func TestResolvePath(t *testing.T) {
 				t.Errorf("ResolvePath(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestResolvePathArrayIndex(t *testing.T) {
+	body := map[string]any{
+		"users": []any{
+			map[string]any{"name": "Alice", "email": "alice@example.com"},
+			map[string]any{"name": "Bob", "email": "bob@example.com"},
+		},
+		"tags": []any{"go", "testing"},
+	}
+
+	tests := []struct {
+		path    string
+		want    any
+		wantErr bool
+	}{
+		{"$.body.users[0].name", "Alice", false},
+		{"$.body.users[1].email", "bob@example.com", false},
+		{"$.body.tags[0]", "go", false},
+		{"$.body.tags[1]", "testing", false},
+		{"$.body.users[5]", nil, true},             // out of bounds
+		{"$.body.tags[0].nested", nil, true},        // traversing into scalar
+		{"$.body.users[*]", nil, true},              // wildcard not supported in ResolvePath
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got, err := ResolvePath(tt.path, body)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got value %v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ResolvePath(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolvePathReturnsWholeArray(t *testing.T) {
+	body := map[string]any{
+		"items": []any{"a", "b", "c"},
+	}
+	got, err := ResolvePath("$.body.items", body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{"a", "b", "c"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ResolvePath = %v, want %v", got, want)
 	}
 }
 

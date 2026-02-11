@@ -21,16 +21,37 @@ func ResolvePath(path string, body any) (any, error) {
 	}
 
 	current := body
-	for _, seg := range segments[1:] {
+	for _, raw := range segments[1:] {
+		seg, err := ParseSegment(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid segment in path %q: %w", path, err)
+		}
+
+		if seg.Wildcard {
+			return nil, fmt.Errorf("wildcard [*] not supported in ResolvePath: %q", path)
+		}
+
 		m, ok := current.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("cannot traverse into %T at segment %q in path %q", current, seg, path)
+			return nil, fmt.Errorf("cannot traverse into %T at segment %q in path %q", current, raw, path)
 		}
-		val, exists := m[seg]
+		val, exists := m[seg.Field]
 		if !exists {
-			return nil, fmt.Errorf("field %q not found in path %q", seg, path)
+			return nil, fmt.Errorf("field %q not found in path %q", seg.Field, path)
 		}
-		current = val
+
+		if seg.Index >= 0 {
+			arr, ok := val.([]any)
+			if !ok {
+				return nil, fmt.Errorf("expected array at %q in path %q, got %T", seg.Field, path, val)
+			}
+			if seg.Index >= len(arr) {
+				return nil, fmt.Errorf("index %d out of bounds (length %d) at %q in path %q", seg.Index, len(arr), seg.Field, path)
+			}
+			current = arr[seg.Index]
+		} else {
+			current = val
+		}
 	}
 	return current, nil
 }
