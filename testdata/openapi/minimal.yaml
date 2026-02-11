@@ -1,0 +1,23 @@
+openapi: "3.0.3"
+info:
+  title: Minimal Service
+  version: "0.1.0"
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
