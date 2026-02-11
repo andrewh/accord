@@ -411,3 +411,70 @@ interactions:
 	}
 	t.Error("expected path warning diagnostic")
 }
+
+func TestRuleMatchingRuleValidBracketSyntax(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        users:
+          - name: "Jane"
+    matching_rules:
+      "$.body.users[0].name":
+        match: type
+      "$.body.users[*].name":
+        match: type
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleMatchingRuleInvalidBracketSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		msg  string
+	}{
+		{"empty brackets", "$.body.items[].name", "invalid bracket syntax"},
+		{"non-numeric", "$.body.items[abc].name", "invalid bracket syntax"},
+		{"negative index", "$.body.items[-1].name", "invalid bracket syntax"},
+		{"unclosed bracket", "$.body.items[0.name", "invalid bracket syntax"},
+		{"filter expression", "$.body.items[?(@.id>1)].name", "invalid bracket syntax"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			yaml := fmt.Sprintf(`
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        items:
+          - name: "x"
+    matching_rules:
+      "%s":
+        match: type
+`, tt.path)
+			diags := lintYAML(t, yaml)
+			requireDiagnostic(t, diags, Warning, tt.msg)
+		})
+	}
+}

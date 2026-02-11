@@ -19,6 +19,9 @@ var validMatchTypes = map[string]bool{
 	"exact": true, "type": true, "regex": true,
 }
 
+// validBracket matches well-formed bracket syntax: [digits] or [*].
+var validBracket = regexp.MustCompile(`^\[\d+\]$|^\[\*\]$`)
+
 // DefaultRules returns the complete set of MVP lint rules.
 func DefaultRules() []Rule {
 	return []Rule{
@@ -189,7 +192,11 @@ func ruleMatchingRules(c *contract.Contract, node *yaml.Node) []Diagnostic {
 				})
 			}
 
-			matchType := rule.Match
+			if diag, ok := validateBrackets(path, prefix, findInteractionNode(node, i)); !ok {
+			diags = append(diags, diag)
+		}
+
+		matchType := rule.Match
 			if matchType == "" {
 				matchType = "exact"
 			}
@@ -229,6 +236,37 @@ func ruleMatchingRules(c *contract.Contract, node *yaml.Node) []Diagnostic {
 	}
 
 	return diags
+}
+
+// validateBrackets checks that any bracket notation in a matching rule path is well-formed.
+func validateBrackets(path, prefix string, ixNode *yaml.Node) (Diagnostic, bool) {
+	for i := 0; i < len(path); i++ {
+		if path[i] != '[' {
+			continue
+		}
+		close := strings.IndexByte(path[i:], ']')
+		if close == -1 {
+			line, col := matchingRuleKeyPosition(ixNode, path)
+			return Diagnostic{
+				Severity: Warning,
+				Message:  fmt.Sprintf("invalid bracket syntax in path %q: unclosed bracket", path),
+				Line:     line, Column: col,
+				Path: prefix + "[" + path + "]",
+			}, false
+		}
+		bracket := path[i : i+close+1]
+		if !validBracket.MatchString(bracket) {
+			line, col := matchingRuleKeyPosition(ixNode, path)
+			return Diagnostic{
+				Severity: Warning,
+				Message:  fmt.Sprintf("invalid bracket syntax in path %q: %s", path, bracket),
+				Line:     line, Column: col,
+				Path: prefix + "[" + path + "]",
+			}, false
+		}
+		i += close
+	}
+	return Diagnostic{}, true
 }
 
 // findKeyPosition returns the line and column of a top-level key in the YAML document.
