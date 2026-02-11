@@ -1,0 +1,203 @@
+// End-to-end tests: build the accord binary and test both commands.
+package accord_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+var binaryPath string
+
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "accord-e2e")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	binaryPath = filepath.Join(dir, "accord")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/accord/")
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		panic("failed to build accord: " + err.Error())
+	}
+
+	os.Exit(m.Run())
+}
+
+func TestE2ELintValidFiles(t *testing.T) {
+	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+	if len(output) != 0 {
+		t.Errorf("expected no output for valid files, got: %s", output)
+	}
+}
+
+func TestE2ELintInvalidFile(t *testing.T) {
+	cmd := exec.Command(binaryPath, "lint", "testdata/invalid/missing_fields.yaml")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for invalid file")
+	}
+
+	out := string(output)
+	expectedMessages := []string{
+		"consumer.name is required",
+		"provider.name is required",
+		"description is required",
+		"request.method is required",
+		"response.status is required",
+	}
+	for _, msg := range expectedMessages {
+		if !strings.Contains(out, msg) {
+			t.Errorf("expected output to contain %q, got:\n%s", msg, out)
+		}
+	}
+}
+
+func TestE2ELintMissingFile(t *testing.T) {
+	cmd := exec.Command(binaryPath, "lint", "nonexistent.yaml")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for missing file")
+	}
+	if !strings.Contains(string(output), "nonexistent.yaml") {
+		t.Errorf("expected error to mention filename, got: %s", output)
+	}
+}
+
+func TestE2ELintNoArgs(t *testing.T) {
+	cmd := exec.Command(binaryPath, "lint")
+	_, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit with no arguments")
+	}
+}
+
+func TestE2EVerifyPass(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":    1,
+			"name":  "Jane Doe",
+			"email": "jane@example.com",
+		})
+	}))
+	defer server.Close()
+
+	// Write a contract that matches the test server
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "get user"
+    request:
+      method: GET
+      path: /users/123
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        id: 1
+        name: "Jane Doe"
+        email: "jane@example.com"
+    matching_rules:
+      "$.body.id":
+        match: type
+      "$.body.name":
+        match: type
+      "$.body.email":
+        match: regex
+        regex: "^[^@]+@[^@]+$"
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "PASS") {
+		t.Errorf("expected PASS in output, got: %s", out)
+	}
+	if !strings.Contains(out, "All interactions passed") {
+		t.Errorf("expected success message, got: %s", out)
+	}
+}
+
+func TestE2EVerifyFail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "get user"
+    request:
+      method: GET
+      path: /users/123
+    response:
+      status: 200
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for verification failure")
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "FAIL") {
+		t.Errorf("expected FAIL in output, got: %s", out)
+	}
+}
+
+func TestE2EVerifyMissingProviderURL(t *testing.T) {
+	cmd := exec.Command(binaryPath, "verify", "testdata/valid/minimal.yaml")
+	_, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit without --provider-url")
+	}
+}
+
+func TestE2EVersion(t *testing.T) {
+	cmd := exec.Command(binaryPath, "version")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v", err)
+	}
+	if !strings.HasPrefix(string(output), "accord ") {
+		t.Errorf("expected output to start with 'accord ', got: %s", output)
+	}
+}
