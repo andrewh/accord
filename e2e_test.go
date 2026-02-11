@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2ELintValidFiles(t *testing.T) {
-	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml", "testdata/valid/array_matching.yaml")
+	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml", "testdata/valid/array_matching.yaml", "testdata/valid/nfr_example.yaml")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
@@ -273,5 +273,180 @@ func TestE2EVersion(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(output), "accord ") {
 		t.Errorf("expected output to start with 'accord ', got: %s", output)
+	}
+}
+
+func TestE2EVerifyNFRPass(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{"id":1}`))
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "small response"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 1000
+      max_round_trip_ms:
+        threshold: 5000
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "PASS") {
+		t.Errorf("expected PASS in output, got: %s", out)
+	}
+}
+
+func TestE2EVerifyNFRWarning(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{"data": "this response body is intentionally larger than 10 bytes"}`))
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "oversized warning"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 10
+        severity: warning
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0 (warning only), got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "WARN") {
+		t.Errorf("expected WARN in output, got: %s", out)
+	}
+	if !strings.Contains(out, "[warning]") {
+		t.Errorf("expected [warning] prefix in output, got: %s", out)
+	}
+}
+
+func TestE2EVerifyNFRError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{"data": "this response body is intentionally larger than 10 bytes"}`))
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "oversized error"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 10
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for NFR error")
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "FAIL") {
+		t.Errorf("expected FAIL in output, got: %s", out)
+	}
+	if !strings.Contains(out, "threshold exceeded") {
+		t.Errorf("expected threshold exceeded message, got: %s", out)
+	}
+}
+
+func TestE2ELintNFRInvalid(t *testing.T) {
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "bad nfr"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 0
+        severity: fatal
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "lint", contractPath)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for invalid NFR")
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "threshold must be > 0") {
+		t.Errorf("expected threshold error, got: %s", out)
+	}
+	if !strings.Contains(out, "invalid severity") {
+		t.Errorf("expected severity error, got: %s", out)
 	}
 }
