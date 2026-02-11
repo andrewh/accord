@@ -6,9 +6,10 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "accord",
-	Short: "File-based contract testing",
-	Long:  "Accord is a consumer-driven contract testing tool using plain YAML files.",
+	Use:           "accord",
+	Short:         "File-based contract testing",
+	Long:          "Accord is a consumer-driven contract testing tool using plain YAML files.",
+	SilenceErrors: true,
 }
 
 func init() {
