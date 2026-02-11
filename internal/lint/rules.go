@@ -22,6 +22,11 @@ var validMatchTypes = map[string]bool{
 // validBracket matches well-formed bracket syntax: [digits] or [*].
 var validBracket = regexp.MustCompile(`^\[\d+\]$|^\[\*\]$`)
 
+var validSeverities = map[string]bool{
+	"error":   true,
+	"warning": true,
+}
+
 // DefaultRules returns the complete set of MVP lint rules.
 func DefaultRules() []Rule {
 	return []Rule{
@@ -29,6 +34,7 @@ func DefaultRules() []Rule {
 		ruleInteractions,
 		ruleDuplicateDescriptions,
 		ruleMatchingRules,
+		ruleNFR,
 	}
 }
 
@@ -267,6 +273,87 @@ func validateBrackets(path, prefix string, ixNode *yaml.Node) (Diagnostic, bool)
 		i += close
 	}
 	return Diagnostic{}, true
+}
+
+// ruleNFR validates NFR thresholds and severity values.
+func ruleNFR(c *contract.Contract, node *yaml.Node) []Diagnostic {
+	var diags []Diagnostic
+
+	type nfrField struct {
+		name      string
+		threshold *contract.NFRThreshold
+	}
+
+	for i, ix := range c.Interactions {
+		if ix.NFR == nil {
+			continue
+		}
+		prefix := fmt.Sprintf("interactions[%d].nfr", i)
+		ixNode := findInteractionNode(node, i)
+
+		fields := []nfrField{
+			{"max_response_bytes", ix.NFR.MaxResponseBytes},
+			{"max_time_to_first_byte_ms", ix.NFR.MaxTimeToFirstByteMs},
+			{"max_round_trip_ms", ix.NFR.MaxRoundTripMs},
+		}
+
+		for _, f := range fields {
+			if f.threshold == nil {
+				continue
+			}
+			if f.threshold.Threshold <= 0 {
+				line, col := nfrFieldPosition(ixNode, f.name, "threshold")
+				diags = append(diags, Diagnostic{
+					Severity: Error,
+					Message:  fmt.Sprintf("threshold must be > 0 for %s", f.name),
+					Line:     line, Column: col,
+					Path: prefix + "." + f.name + ".threshold",
+				})
+			}
+			if f.threshold.Severity != "" && !validSeverities[f.threshold.Severity] {
+				line, col := nfrFieldPosition(ixNode, f.name, "severity")
+				diags = append(diags, Diagnostic{
+					Severity: Error,
+					Message:  fmt.Sprintf("invalid severity %q for %s (must be %q or %q)", f.threshold.Severity, f.name, "error", "warning"),
+					Line:     line, Column: col,
+					Path: prefix + "." + f.name + ".severity",
+				})
+			}
+		}
+	}
+
+	return diags
+}
+
+// nfrFieldPosition returns the position of a subfield within an NFR entry.
+// Navigates: interaction -> nfr -> fieldName -> subfield.
+func nfrFieldPosition(ixNode *yaml.Node, fieldName, subfield string) (int, int) {
+	if ixNode == nil {
+		return 1, 1
+	}
+	// Find "nfr" key in interaction
+	for i := 0; i < len(ixNode.Content)-1; i += 2 {
+		if ixNode.Content[i].Value != "nfr" {
+			continue
+		}
+		nfrMapping := ixNode.Content[i+1]
+		// Find fieldName (e.g. "max_response_bytes")
+		for j := 0; j < len(nfrMapping.Content)-1; j += 2 {
+			if nfrMapping.Content[j].Value != fieldName {
+				continue
+			}
+			fieldMapping := nfrMapping.Content[j+1]
+			// Find subfield (e.g. "threshold" or "severity")
+			for k := 0; k < len(fieldMapping.Content)-1; k += 2 {
+				if fieldMapping.Content[k].Value == subfield {
+					return fieldMapping.Content[k].Line, fieldMapping.Content[k].Column
+				}
+			}
+			return nfrMapping.Content[j].Line, nfrMapping.Content[j].Column
+		}
+		return ixNode.Content[i].Line, ixNode.Content[i].Column
+	}
+	return ixNode.Line, ixNode.Column
 }
 
 // findKeyPosition returns the line and column of a top-level key in the YAML document.
