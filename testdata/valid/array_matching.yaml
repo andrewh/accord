@@ -1,0 +1,38 @@
+accord: "0.1"
+
+consumer:
+  name: "dashboard-ui"
+
+provider:
+  name: "user-service"
+
+interactions:
+  - description: "list users with array matching"
+    request:
+      method: GET
+      path: /users
+
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        users:
+          - name: "Jane Doe"
+            email: "jane@example.com"
+            roles:
+              - "admin"
+              - "user"
+          - name: "Bob Smith"
+            email: "bob@example.com"
+            roles:
+              - "user"
+
+    matching_rules:
+      "$.body.users[*].name":
+        match: type
+      "$.body.users[*].email":
+        match: regex
+        regex: "^[^@]+@[^@]+$"
+      "$.body.users[0].roles[0]":
+        match: exact

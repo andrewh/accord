@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2ELintValidFiles(t *testing.T) {
-	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml")
+	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml", "testdata/valid/array_matching.yaml")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
@@ -188,6 +188,80 @@ func TestE2EVerifyMissingProviderURL(t *testing.T) {
 	_, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected non-zero exit without --provider-url")
+	}
+}
+
+func TestE2EVerifyArrayWildcard(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"users": []any{
+				map[string]any{
+					"name":  "Xavier Jones",
+					"email": "xavier@test.com",
+					"roles": []any{"admin", "user"},
+				},
+				map[string]any{
+					"name":  "Yolanda Park",
+					"email": "yolanda@test.com",
+					"roles": []any{"user"},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "list users with wildcard matching"
+    request:
+      method: GET
+      path: /users
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        users:
+          - name: "Jane Doe"
+            email: "jane@example.com"
+            roles:
+              - "admin"
+              - "user"
+          - name: "Bob Smith"
+            email: "bob@example.com"
+            roles:
+              - "user"
+    matching_rules:
+      "$.body.users[*].name":
+        match: type
+      "$.body.users[*].email":
+        match: regex
+        regex: "^[^@]+@[^@]+$"
+      "$.body.users[0].roles[0]":
+        match: exact
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "PASS") {
+		t.Errorf("expected PASS in output, got: %s", out)
 	}
 }
 
