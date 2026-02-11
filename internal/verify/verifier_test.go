@@ -701,6 +701,134 @@ func TestSendRequestMetrics(t *testing.T) {
 	}
 }
 
+func TestCheckNFRBytesExceeded(t *testing.T) {
+	var result Result
+	nfr := &contract.NFR{
+		MaxResponseBytes: &contract.NFRThreshold{Threshold: 10},
+	}
+	metrics := &RequestMetrics{RoundTripMs: 5, TimeToFirstByteMs: 2}
+	checkNFR(&result, nfr, metrics, 100)
+
+	if len(result.Failures) != 1 {
+		t.Fatalf("expected 1 failure, got %d: %v", len(result.Failures), result.Failures)
+	}
+	if result.Failures[0].Severity != SeverityError {
+		t.Errorf("expected error severity, got %d", result.Failures[0].Severity)
+	}
+	if result.Failures[0].Field != "nfr.max_response_bytes" {
+		t.Errorf("field = %q, want %q", result.Failures[0].Field, "nfr.max_response_bytes")
+	}
+}
+
+func TestCheckNFRBytesWithinLimit(t *testing.T) {
+	var result Result
+	nfr := &contract.NFR{
+		MaxResponseBytes: &contract.NFRThreshold{Threshold: 1000},
+	}
+	metrics := &RequestMetrics{RoundTripMs: 5, TimeToFirstByteMs: 2}
+	checkNFR(&result, nfr, metrics, 100)
+
+	if len(result.Failures) != 0 {
+		t.Errorf("expected no failures, got: %v", result.Failures)
+	}
+}
+
+func TestCheckNFRWarningSeverity(t *testing.T) {
+	var result Result
+	nfr := &contract.NFR{
+		MaxResponseBytes: &contract.NFRThreshold{Threshold: 10, Severity: "warning"},
+	}
+	metrics := &RequestMetrics{RoundTripMs: 5, TimeToFirstByteMs: 2}
+	checkNFR(&result, nfr, metrics, 100)
+
+	if len(result.Failures) != 1 {
+		t.Fatalf("expected 1 failure, got %d", len(result.Failures))
+	}
+	if result.Failures[0].Severity != SeverityWarning {
+		t.Errorf("expected warning severity, got %d", result.Failures[0].Severity)
+	}
+}
+
+func TestCheckNFRTimingExceeded(t *testing.T) {
+	var result Result
+	nfr := &contract.NFR{
+		MaxRoundTripMs:       &contract.NFRThreshold{Threshold: 10},
+		MaxTimeToFirstByteMs: &contract.NFRThreshold{Threshold: 5},
+	}
+	metrics := &RequestMetrics{RoundTripMs: 50, TimeToFirstByteMs: 20}
+	checkNFR(&result, nfr, metrics, 0)
+
+	if len(result.Failures) != 2 {
+		t.Fatalf("expected 2 failures, got %d: %v", len(result.Failures), result.Failures)
+	}
+}
+
+func TestCheckNFRNilIsNoOp(t *testing.T) {
+	var result Result
+	metrics := &RequestMetrics{RoundTripMs: 50, TimeToFirstByteMs: 20}
+	checkNFR(&result, nil, metrics, 100)
+
+	if len(result.Failures) != 0 {
+		t.Errorf("expected no failures for nil NFR, got: %v", result.Failures)
+	}
+}
+
+func TestVerifyNFRIntegration(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		// Write a body larger than threshold
+		w.Write([]byte(`{"data": "this is a fairly long response body string"}`))
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "nfr test",
+				Request:     contract.Request{Method: "GET", Path: "/test"},
+				Response:    contract.Response{Status: 200},
+				NFR: &contract.NFR{
+					MaxResponseBytes: &contract.NFRThreshold{Threshold: 10},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if results[0].Passed {
+		t.Error("expected failure when response exceeds max_response_bytes")
+	}
+}
+
+func TestVerifyNFRWarningStillPasses(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{"data": "this is a fairly long response body string"}`))
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "nfr warning test",
+				Request:     contract.Request{Method: "GET", Path: "/test"},
+				Response:    contract.Response{Status: 200},
+				NFR: &contract.NFR{
+					MaxResponseBytes: &contract.NFRThreshold{Threshold: 10, Severity: "warning"},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if !results[0].Passed {
+		t.Errorf("expected pass with warning-only NFR failure, got: %v", results[0].Failures)
+	}
+	if len(results[0].Failures) == 0 {
+		t.Error("expected warning failure to be recorded")
+	}
+}
+
 func TestSeverityZeroValueIsError(t *testing.T) {
 	f := Failure{Field: "status", Message: "mismatch"}
 	if f.Severity != SeverityError {

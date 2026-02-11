@@ -147,8 +147,46 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		}
 	}
 
+	// Check non-functional requirements
+	var responseBytes int64
+	if bodyErr == nil {
+		responseBytes = int64(len(bodyBytes))
+	}
+	checkNFR(&result, ix.NFR, metrics, responseBytes)
+
 	result.Passed = !hasErrors(result.Failures)
 	return result
+}
+
+// checkNFR compares measured values against NFR thresholds and appends failures.
+func checkNFR(result *Result, nfr *contract.NFR, metrics *RequestMetrics, responseBytes int64) {
+	if nfr == nil {
+		return
+	}
+
+	checkThreshold := func(t *contract.NFRThreshold, field string, actual int64) {
+		if t == nil {
+			return
+		}
+		if actual <= int64(t.Threshold) {
+			return
+		}
+		sev := SeverityError
+		if t.Severity == "warning" {
+			sev = SeverityWarning
+		}
+		result.Failures = append(result.Failures, Failure{
+			Field:    "nfr." + field,
+			Expected: fmt.Sprintf("<= %d", t.Threshold),
+			Actual:   fmt.Sprintf("%d", actual),
+			Message:  "threshold exceeded",
+			Severity: sev,
+		})
+	}
+
+	checkThreshold(nfr.MaxResponseBytes, "max_response_bytes", responseBytes)
+	checkThreshold(nfr.MaxTimeToFirstByteMs, "max_time_to_first_byte_ms", metrics.TimeToFirstByteMs)
+	checkThreshold(nfr.MaxRoundTripMs, "max_round_trip_ms", metrics.RoundTripMs)
 }
 
 // indexToWildcard replaces numeric array indices with wildcards in a path.
