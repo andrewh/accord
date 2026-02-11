@@ -535,9 +535,28 @@ func TestE2EGenerateEndpointFilter(t *testing.T) {
 	}
 
 	out := string(output)
-	// Should have interactions for /pets but not for /pets/{petId}
-	if !strings.Contains(out, "interactions:") {
-		t.Errorf("expected interactions in output, got: %s", out)
+	if !strings.Contains(out, "List all pets") {
+		t.Errorf("expected interaction for 'List all pets' (GET /pets), got: %s", out)
+	}
+	if !strings.Contains(out, "Create a pet") {
+		t.Errorf("expected interaction for 'Create a pet' (POST /pets), got: %s", out)
+	}
+	if strings.Contains(out, "Get a pet by ID") {
+		t.Errorf("expected 'Get a pet by ID' (GET /pets/{petId}) to be filtered out")
+	}
+	if strings.Contains(out, "Get pet health record") {
+		t.Errorf("expected 'Get pet health record' to be filtered out")
+	}
+}
+
+func TestE2EGenerateBadPattern(t *testing.T) {
+	cmd := exec.Command(binaryPath, "generate", "--dry-run", "--endpoints", "[invalid", "testdata/openapi/petstore.yaml")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for malformed glob pattern")
+	}
+	if !strings.Contains(string(output), "invalid endpoint filter pattern") {
+		t.Errorf("expected descriptive error, got: %s", output)
 	}
 }
 

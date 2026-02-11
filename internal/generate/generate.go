@@ -45,7 +45,10 @@ func fromSpec(spec *openapi.Spec, opts Options) ([]Output, error) {
 	}
 	provider := sanitiseName(spec.Title)
 
-	endpoints := filterEndpoints(spec.Endpoints, opts.Endpoints)
+	endpoints, err := filterEndpoints(spec.Endpoints, opts.Endpoints)
+	if err != nil {
+		return nil, err
+	}
 
 	var interactions []contract.Interaction
 	for _, ep := range endpoints {
@@ -95,18 +98,21 @@ func WriteFiles(outputs []Output) error {
 
 // filterEndpoints returns endpoints matching the given glob pattern.
 // An empty pattern matches all endpoints.
-func filterEndpoints(endpoints []openapi.Endpoint, pattern string) []openapi.Endpoint {
+func filterEndpoints(endpoints []openapi.Endpoint, pattern string) ([]openapi.Endpoint, error) {
 	if pattern == "" {
-		return endpoints
+		return endpoints, nil
 	}
 	var filtered []openapi.Endpoint
 	for _, ep := range endpoints {
 		matched, err := path.Match(pattern, ep.Path)
-		if err == nil && matched {
+		if err != nil {
+			return nil, fmt.Errorf("invalid endpoint filter pattern %q: %w", pattern, err)
+		}
+		if matched {
 			filtered = append(filtered, ep)
 		}
 	}
-	return filtered
+	return filtered, nil
 }
 
 var nonAlphanumeric = regexp.MustCompile(`[^a-z0-9]+`)

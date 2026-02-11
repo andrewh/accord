@@ -42,6 +42,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	outputs, err := generate.FromFile(args[0], opts)
 	if err != nil {
 		cmd.SilenceUsage = true
+		fmt.Fprintln(os.Stderr, err)
 		return err
 	}
 

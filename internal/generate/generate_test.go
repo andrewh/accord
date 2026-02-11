@@ -168,3 +168,16 @@ func TestGenerateFileNotFound(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestGenerateBadEndpointPattern(t *testing.T) {
+	_, err := FromFile("../../testdata/openapi/petstore.yaml", Options{
+		Consumer:  "test",
+		Endpoints: "[invalid",
+	})
+	if err == nil {
+		t.Fatal("expected error for malformed glob pattern")
+	}
+	if !strings.Contains(err.Error(), "invalid endpoint filter pattern") {
+		t.Errorf("expected descriptive error, got: %v", err)
+	}
+}
