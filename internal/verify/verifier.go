@@ -16,6 +16,14 @@ import (
 
 var indexPattern = regexp.MustCompile(`\[\d+\]`)
 
+// Severity indicates whether a verification failure is an error or warning.
+type Severity int
+
+const (
+	SeverityError   Severity = iota
+	SeverityWarning
+)
+
 // Result holds the outcome of verifying a single interaction.
 type Result struct {
 	Interaction string
@@ -29,6 +37,17 @@ type Failure struct {
 	Expected string
 	Actual   string
 	Message  string
+	Severity Severity
+}
+
+// hasErrors returns true if any failure has error severity.
+func hasErrors(failures []Failure) bool {
+	for _, f := range failures {
+		if f.Severity == SeverityError {
+			return true
+		}
+	}
+	return false
 }
 
 func (f Failure) String() string {
@@ -124,7 +143,7 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		}
 	}
 
-	result.Passed = len(result.Failures) == 0
+	result.Passed = !hasErrors(result.Failures)
 	return result
 }
 

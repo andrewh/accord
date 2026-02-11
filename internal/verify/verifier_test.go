@@ -635,6 +635,53 @@ func TestVerifyWildcardMatchingRule(t *testing.T) {
 	}
 }
 
+func TestSeverityWarningOnlyPasses(t *testing.T) {
+	r := Result{
+		Interaction: "test",
+		Failures: []Failure{
+			{Field: "nfr.max_response_bytes", Message: "exceeded", Severity: SeverityWarning},
+		},
+	}
+	r.Passed = !hasErrors(r.Failures)
+	if !r.Passed {
+		t.Error("expected Passed=true when only warnings present")
+	}
+}
+
+func TestSeverityErrorFails(t *testing.T) {
+	r := Result{
+		Interaction: "test",
+		Failures: []Failure{
+			{Field: "nfr.max_round_trip_ms", Message: "exceeded", Severity: SeverityError},
+		},
+	}
+	r.Passed = !hasErrors(r.Failures)
+	if r.Passed {
+		t.Error("expected Passed=false when error present")
+	}
+}
+
+func TestSeverityMixedFails(t *testing.T) {
+	r := Result{
+		Interaction: "test",
+		Failures: []Failure{
+			{Field: "nfr.max_response_bytes", Message: "exceeded", Severity: SeverityWarning},
+			{Field: "nfr.max_round_trip_ms", Message: "exceeded", Severity: SeverityError},
+		},
+	}
+	r.Passed = !hasErrors(r.Failures)
+	if r.Passed {
+		t.Error("expected Passed=false when mix of warnings and errors")
+	}
+}
+
+func TestSeverityZeroValueIsError(t *testing.T) {
+	f := Failure{Field: "status", Message: "mismatch"}
+	if f.Severity != SeverityError {
+		t.Errorf("zero value Severity = %d, want SeverityError (0)", f.Severity)
+	}
+}
+
 func TestVerifySpecificIndexOverridesWildcard(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
