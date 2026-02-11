@@ -478,3 +478,109 @@ interactions:
 		})
 	}
 }
+
+func TestRuleNFRValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 4096
+        severity: warning
+      max_round_trip_ms:
+        threshold: 500
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleNFROmitted(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleNFRZeroThreshold(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 0
+`)
+	requireDiagnostic(t, diags, Error, "threshold must be > 0")
+}
+
+func TestRuleNFRNegativeThreshold(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_round_trip_ms:
+        threshold: -1
+`)
+	requireDiagnostic(t, diags, Error, "threshold must be > 0")
+}
+
+func TestRuleNFRInvalidSeverity(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 4096
+        severity: fatal
+`)
+	requireDiagnostic(t, diags, Error, "invalid severity")
+}

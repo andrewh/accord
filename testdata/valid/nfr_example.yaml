@@ -1,0 +1,20 @@
+accord: "0.1"
+consumer:
+  name: "order-service"
+provider:
+  name: "user-service"
+interactions:
+  - description: "get user with NFR constraints"
+    request:
+      method: GET
+      path: /users/123
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 4096
+        severity: warning
+      max_time_to_first_byte_ms:
+        threshold: 200
+      max_round_trip_ms:
+        threshold: 500

@@ -7,14 +7,24 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/andrewh/accord/internal/contract"
 )
 
 var indexPattern = regexp.MustCompile(`\[\d+\]`)
+
+// Severity indicates whether a verification failure is an error or warning.
+type Severity int
+
+const (
+	SeverityError   Severity = iota
+	SeverityWarning
+)
 
 // Result holds the outcome of verifying a single interaction.
 type Result struct {
@@ -29,6 +39,17 @@ type Failure struct {
 	Expected string
 	Actual   string
 	Message  string
+	Severity Severity
+}
+
+// hasErrors returns true if any failure has error severity.
+func hasErrors(failures []Failure) bool {
+	for _, f := range failures {
+		if f.Severity == SeverityError {
+			return true
+		}
+	}
+	return false
 }
 
 func (f Failure) String() string {
@@ -47,7 +68,7 @@ func Verify(c *contract.Contract, providerURL string) []Result {
 func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 	result := Result{Interaction: ix.Description}
 
-	resp, err := sendRequest(ix.Request, providerURL)
+	metrics, err := sendRequest(ix.Request, providerURL)
 	if err != nil {
 		result.Failures = append(result.Failures, Failure{
 			Field:   "request",
@@ -55,7 +76,8 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		})
 		return result
 	}
-	defer resp.Body.Close()
+	resp := metrics.Response
+	defer func() { _ = resp.Body.Close() }()
 
 	// Compare status
 	if ix.Response.Status != 0 {
@@ -103,29 +125,68 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		}
 	}
 
+	// Read response body (needed for both body comparison and NFR byte count)
+	bodyBytes, bodyErr := io.ReadAll(resp.Body)
+	if bodyErr != nil {
+		result.Failures = append(result.Failures, Failure{
+			Field:   "body",
+			Message: fmt.Sprintf("failed to read response body: %v", bodyErr),
+		})
+	}
+
 	// Compare body
-	if ix.Response.Body != nil {
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
+	if ix.Response.Body != nil && bodyErr == nil {
+		var actualBody any
+		if err := json.Unmarshal(bodyBytes, &actualBody); err != nil {
 			result.Failures = append(result.Failures, Failure{
 				Field:   "body",
-				Message: fmt.Sprintf("failed to read response body: %v", err),
+				Message: fmt.Sprintf("failed to parse response body as JSON: %v", err),
 			})
 		} else {
-			var actualBody any
-			if err := json.Unmarshal(bodyBytes, &actualBody); err != nil {
-				result.Failures = append(result.Failures, Failure{
-					Field:   "body",
-					Message: fmt.Sprintf("failed to parse response body as JSON: %v", err),
-				})
-			} else {
-				compareBody(&result, ix.Response.Body, actualBody, ix.MatchingRules, "body")
-			}
+			compareBody(&result, ix.Response.Body, actualBody, ix.MatchingRules, "body")
 		}
 	}
 
-	result.Passed = len(result.Failures) == 0
+	// Check non-functional requirements
+	var responseBytes int64
+	if bodyErr == nil {
+		responseBytes = int64(len(bodyBytes))
+	}
+	checkNFR(&result, ix.NFR, metrics, responseBytes)
+
+	result.Passed = !hasErrors(result.Failures)
 	return result
+}
+
+// checkNFR compares measured values against NFR thresholds and appends failures.
+func checkNFR(result *Result, nfr *contract.NFR, metrics *RequestMetrics, responseBytes int64) {
+	if nfr == nil {
+		return
+	}
+
+	checkThreshold := func(t *contract.NFRThreshold, field string, actual int64) {
+		if t == nil {
+			return
+		}
+		if actual <= int64(t.Threshold) {
+			return
+		}
+		sev := SeverityError
+		if t.Severity == "warning" {
+			sev = SeverityWarning
+		}
+		result.Failures = append(result.Failures, Failure{
+			Field:    "nfr." + field,
+			Expected: fmt.Sprintf("<= %d", t.Threshold),
+			Actual:   fmt.Sprintf("%d", actual),
+			Message:  "threshold exceeded",
+			Severity: sev,
+		})
+	}
+
+	checkThreshold(nfr.MaxResponseBytes, "max_response_bytes", responseBytes)
+	checkThreshold(nfr.MaxTimeToFirstByteMs, "max_time_to_first_byte_ms", metrics.TimeToFirstByteMs)
+	checkThreshold(nfr.MaxRoundTripMs, "max_round_trip_ms", metrics.RoundTripMs)
 }
 
 // indexToWildcard replaces numeric array indices with wildcards in a path.
@@ -253,7 +314,14 @@ func compareBodyScalar(result *Result, expected, actual any, rules contract.Matc
 	}
 }
 
-func sendRequest(req contract.Request, providerURL string) (*http.Response, error) {
+// RequestMetrics holds the HTTP response and timing measurements.
+type RequestMetrics struct {
+	Response          *http.Response
+	RoundTripMs       int64
+	TimeToFirstByteMs int64
+}
+
+func sendRequest(req contract.Request, providerURL string) (*RequestMetrics, error) {
 	fullURL := strings.TrimRight(providerURL, "/") + req.Path
 
 	if len(req.Query) > 0 {
@@ -286,5 +354,24 @@ func sendRequest(req contract.Request, providerURL string) (*http.Response, erro
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
 
-	return http.DefaultClient.Do(httpReq)
+	var ttfb time.Duration
+	start := time.Now()
+	trace := &httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			ttfb = time.Since(start)
+		},
+	}
+	httpReq = httpReq.WithContext(httptrace.WithClientTrace(httpReq.Context(), trace))
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+
+	roundTrip := time.Since(start)
+	return &RequestMetrics{
+		Response:          resp,
+		RoundTripMs:       roundTrip.Milliseconds(),
+		TimeToFirstByteMs: ttfb.Milliseconds(),
+	}, nil
 }

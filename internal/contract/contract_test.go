@@ -207,3 +207,95 @@ func TestParseFileMissing(t *testing.T) {
 		t.Fatal("expected error for missing file, got nil")
 	}
 }
+
+func TestParseNFR(t *testing.T) {
+	data := []byte(`
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+    nfr:
+      max_response_bytes:
+        threshold: 4096
+        severity: warning
+      max_time_to_first_byte_ms:
+        threshold: 200
+      max_round_trip_ms:
+        threshold: 500
+        severity: error
+`)
+
+	result, err := Parse(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	nfr := result.Contract.Interactions[0].NFR
+	if nfr == nil {
+		t.Fatal("expected NFR to be non-nil")
+	}
+
+	if nfr.MaxResponseBytes == nil {
+		t.Fatal("expected MaxResponseBytes to be non-nil")
+	}
+	if nfr.MaxResponseBytes.Threshold != 4096 {
+		t.Errorf("MaxResponseBytes.Threshold = %d, want 4096", nfr.MaxResponseBytes.Threshold)
+	}
+	if nfr.MaxResponseBytes.Severity != "warning" {
+		t.Errorf("MaxResponseBytes.Severity = %q, want %q", nfr.MaxResponseBytes.Severity, "warning")
+	}
+
+	if nfr.MaxTimeToFirstByteMs == nil {
+		t.Fatal("expected MaxTimeToFirstByteMs to be non-nil")
+	}
+	if nfr.MaxTimeToFirstByteMs.Threshold != 200 {
+		t.Errorf("MaxTimeToFirstByteMs.Threshold = %d, want 200", nfr.MaxTimeToFirstByteMs.Threshold)
+	}
+	if nfr.MaxTimeToFirstByteMs.Severity != "" {
+		t.Errorf("MaxTimeToFirstByteMs.Severity = %q, want empty", nfr.MaxTimeToFirstByteMs.Severity)
+	}
+
+	if nfr.MaxRoundTripMs == nil {
+		t.Fatal("expected MaxRoundTripMs to be non-nil")
+	}
+	if nfr.MaxRoundTripMs.Threshold != 500 {
+		t.Errorf("MaxRoundTripMs.Threshold = %d, want 500", nfr.MaxRoundTripMs.Threshold)
+	}
+	if nfr.MaxRoundTripMs.Severity != "error" {
+		t.Errorf("MaxRoundTripMs.Severity = %q, want %q", nfr.MaxRoundTripMs.Severity, "error")
+	}
+}
+
+func TestParseNFROmitted(t *testing.T) {
+	data := []byte(`
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+`)
+
+	result, err := Parse(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Contract.Interactions[0].NFR != nil {
+		t.Errorf("expected NFR to be nil when omitted, got %v", result.Contract.Interactions[0].NFR)
+	}
+}
