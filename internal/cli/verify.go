@@ -14,7 +14,7 @@ var providerURL string
 
 func init() {
 	verifyCmd.Flags().StringVar(&providerURL, "provider-url", "", "Base URL of the running provider")
-	verifyCmd.MarkFlagRequired("provider-url")
+	_ = verifyCmd.MarkFlagRequired("provider-url")
 	rootCmd.AddCommand(verifyCmd)
 }
 

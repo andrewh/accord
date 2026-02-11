@@ -77,7 +77,7 @@ func verifyInteraction(ix contract.Interaction, providerURL string) Result {
 		return result
 	}
 	resp := metrics.Response
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Compare status
 	if ix.Response.Status != 0 {
