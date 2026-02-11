@@ -1,0 +1,35 @@
+accord: "0.1"
+
+consumer:
+  name: "order-service"
+
+provider:
+  name: "user-service"
+
+interactions:
+  - description: "get a user by ID"
+    request:
+      method: GET
+      path: /users/123
+      headers:
+        Accept: application/json
+      query:
+        include: "email"
+
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        id: 123
+        name: "Jane Doe"
+        email: "jane@example.com"
+
+    matching_rules:
+      "$.body.id":
+        match: type
+      "$.body.name":
+        match: type
+      "$.body.email":
+        match: regex
+        regex: "^[^@]+@[^@]+$"

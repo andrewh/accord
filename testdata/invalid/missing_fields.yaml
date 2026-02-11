@@ -1,0 +1,11 @@
+accord: "0.1"
+
+consumer:
+  name: ""
+
+interactions:
+  - description: ""
+    request:
+      path: /users
+    response:
+      status: 0

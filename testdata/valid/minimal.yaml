@@ -1,0 +1,16 @@
+accord: "0.1"
+
+consumer:
+  name: "client-a"
+
+provider:
+  name: "service-b"
+
+interactions:
+  - description: "health check"
+    request:
+      method: GET
+      path: /health
+
+    response:
+      status: 200
