@@ -57,18 +57,18 @@ func (f Failure) String() string {
 }
 
 // Verify runs all interactions in a contract against a live provider.
-func Verify(c *contract.Contract, providerURL string) []Result {
+func Verify(c *contract.Contract, providerURL string, timeout time.Duration) []Result {
 	var results []Result
 	for _, ix := range c.Interactions {
-		results = append(results, verifyInteraction(ix, providerURL))
+		results = append(results, verifyInteraction(ix, providerURL, timeout))
 	}
 	return results
 }
 
-func verifyInteraction(ix contract.Interaction, providerURL string) Result {
+func verifyInteraction(ix contract.Interaction, providerURL string, timeout time.Duration) Result {
 	result := Result{Interaction: ix.Description}
 
-	metrics, err := sendRequest(ix.Request, providerURL)
+	metrics, err := sendRequest(ix.Request, providerURL, timeout)
 	if err != nil {
 		result.Failures = append(result.Failures, Failure{
 			Field:   "request",
@@ -321,7 +321,7 @@ type RequestMetrics struct {
 	TimeToFirstByteMs int64
 }
 
-func sendRequest(req contract.Request, providerURL string) (*RequestMetrics, error) {
+func sendRequest(req contract.Request, providerURL string, timeout time.Duration) (*RequestMetrics, error) {
 	fullURL := strings.TrimRight(providerURL, "/") + req.Path
 
 	if len(req.Query) > 0 {
@@ -363,7 +363,8 @@ func sendRequest(req contract.Request, providerURL string) (*RequestMetrics, err
 	}
 	httpReq = httpReq.WithContext(httptrace.WithClientTrace(httpReq.Context(), trace))
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}

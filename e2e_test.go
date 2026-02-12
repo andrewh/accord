@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var binaryPath string
@@ -777,5 +778,47 @@ func TestE2EConvertNoArgs(t *testing.T) {
 	_, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected non-zero exit with no arguments")
+	}
+}
+
+func TestE2EVerifyTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(3 * time.Second)
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "slow endpoint"
+    request:
+      method: GET
+      path: /slow
+    response:
+      status: 200
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, "--timeout", "1", contractPath)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for timeout")
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "FAIL") {
+		t.Errorf("expected FAIL in output, got: %s", out)
+	}
+	if !strings.Contains(out, "failed to send request") {
+		t.Errorf("expected timeout error message, got: %s", out)
 	}
 }

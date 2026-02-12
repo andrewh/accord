@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/andrewh/accord/internal/contract"
 )
@@ -50,7 +51,7 @@ func TestVerifyExactMatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 
 	if len(results) != 1 {
 		t.Fatalf("len(results) = %d, want 1", len(results))
@@ -76,7 +77,7 @@ func TestVerifyStatusMismatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for status mismatch")
 	}
@@ -108,7 +109,7 @@ func TestVerifyHeaderMismatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for header mismatch")
 	}
@@ -141,7 +142,7 @@ func TestVerifyBodyFieldMismatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for body mismatch")
 	}
@@ -178,7 +179,7 @@ func TestVerifyWithTypeMatchingRule(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass with type matching, got failures: %v", results[0].Failures)
 	}
@@ -210,7 +211,7 @@ func TestVerifyWithRegexMatchingRule(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass with regex matching, got failures: %v", results[0].Failures)
 	}
@@ -242,7 +243,7 @@ func TestVerifyRegexFailure(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for regex mismatch")
 	}
@@ -275,7 +276,7 @@ func TestVerifyWithRequestBody(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass, got failures: %v", results[0].Failures)
 	}
@@ -304,7 +305,7 @@ func TestVerifyWithRequestHeaders(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass, got failures: %v", results[0].Failures)
 	}
@@ -332,7 +333,7 @@ func TestVerifyCollectsAllFailures(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failures")
 	}
@@ -376,7 +377,7 @@ func TestVerifyMultipleInteractions(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if len(results) != 2 {
 		t.Fatalf("len(results) = %d, want 2", len(results))
 	}
@@ -412,7 +413,7 @@ func TestVerifyArrayExactMatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass, got failures: %v", results[0].Failures)
 	}
@@ -443,7 +444,7 @@ func TestVerifyArrayLengthMismatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for array length mismatch")
 	}
@@ -474,7 +475,7 @@ func TestVerifyArrayTypeMismatch(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for type mismatch (string vs array)")
 	}
@@ -511,7 +512,7 @@ func TestVerifyNestedArrayObjects(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass, got failures: %v", results[0].Failures)
 	}
@@ -550,7 +551,7 @@ func TestVerifyArrayElementMatchingRule(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass with element matching rules, got failures: %v", results[0].Failures)
 	}
@@ -581,7 +582,7 @@ func TestVerifyArrayElementFailurePath(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for element mismatch")
 	}
@@ -629,7 +630,7 @@ func TestVerifyWildcardMatchingRule(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass with wildcard matching rules, got failures: %v", results[0].Failures)
 	}
@@ -683,7 +684,7 @@ func TestSendRequestMetrics(t *testing.T) {
 	defer server.Close()
 
 	req := contract.Request{Method: "GET", Path: "/health"}
-	metrics, err := sendRequest(req, server.URL)
+	metrics, err := sendRequest(req, server.URL, 30*time.Second)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -794,7 +795,7 @@ func TestVerifyNFRIntegration(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure when response exceeds max_response_bytes")
 	}
@@ -820,7 +821,7 @@ func TestVerifyNFRWarningStillPasses(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass with warning-only NFR failure, got: %v", results[0].Failures)
 	}
@@ -882,7 +883,7 @@ func TestVerifyWithNewMatchTypes(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if !results[0].Passed {
 		t.Errorf("expected pass with new match types, got failures: %v", results[0].Failures)
 	}
@@ -924,7 +925,7 @@ func TestVerifyNewMatchTypesFailure(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	if results[0].Passed {
 		t.Error("expected failure for new match types")
 	}
@@ -968,10 +969,42 @@ func TestVerifySpecificIndexOverridesWildcard(t *testing.T) {
 		},
 	}
 
-	results := Verify(c, server.URL)
+	results := Verify(c, server.URL, 30*time.Second)
 	// items[0].id should use exact (42 == 42, pass)
 	// items[1].id should use wildcard type (99 is number like 1, pass)
 	if !results[0].Passed {
 		t.Errorf("expected pass, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestVerifyTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "slow endpoint",
+				Request:     contract.Request{Method: "GET", Path: "/slow"},
+				Response:    contract.Response{Status: 200},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL, 50*time.Millisecond)
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if results[0].Passed {
+		t.Error("expected failure due to timeout")
+	}
+	if len(results[0].Failures) == 0 {
+		t.Fatal("expected at least one failure")
+	}
+	if results[0].Failures[0].Field != "request" {
+		t.Errorf("failure field = %q, want %q", results[0].Failures[0].Field, "request")
 	}
 }

@@ -4,6 +4,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/andrewh/accord/internal/contract"
 	"github.com/andrewh/accord/internal/verify"
@@ -11,9 +12,11 @@ import (
 )
 
 var providerURL string
+var timeout int
 
 func init() {
 	verifyCmd.Flags().StringVar(&providerURL, "provider-url", "", "Base URL of the running provider")
+	verifyCmd.Flags().IntVar(&timeout, "timeout", 30, "HTTP request timeout in seconds")
 	_ = verifyCmd.MarkFlagRequired("provider-url")
 	rootCmd.AddCommand(verifyCmd)
 }
@@ -40,7 +43,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		c := result.Contract
 		fmt.Printf("Verifying %s (%s -> %s)\n", path, c.Consumer.Name, c.Provider.Name)
 
-		results := verify.Verify(c, providerURL)
+		results := verify.Verify(c, providerURL, time.Duration(timeout)*time.Second)
 		for _, r := range results {
 			hasWarnings := len(r.Failures) > 0 && r.Passed
 			switch {
