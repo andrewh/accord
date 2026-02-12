@@ -1,0 +1,38 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "user-api"
+  },
+  "interactions": [
+    {
+      "description": "a request for a user",
+      "request": {
+        "method": "GET",
+        "path": "/users/1",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "query": {
+          "include": ["email"]
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1,
+          "name": "Jane Doe"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

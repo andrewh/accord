@@ -1,0 +1,57 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "user-api"
+  },
+  "interactions": [
+    {
+      "description": "a request with provider states",
+      "providerStates": [
+        {
+          "name": "user 1 exists",
+          "params": {"id": 1}
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/users/1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1,
+          "name": "Jane Doe"
+        },
+        "generators": {
+          "body": {
+            "$.id": {"type": "RandomInt", "min": 1, "max": 1000}
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "matchers": [{"match": "type"}]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "messages": [
+    {
+      "description": "a user created event",
+      "contents": {"userId": 1},
+      "metaData": {"topic": "users"}
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}

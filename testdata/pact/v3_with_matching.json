@@ -1,0 +1,56 @@
+{
+  "consumer": {
+    "name": "web-app"
+  },
+  "provider": {
+    "name": "user-api"
+  },
+  "interactions": [
+    {
+      "description": "a request for a user",
+      "request": {
+        "method": "GET",
+        "path": "/users/1",
+        "headers": {
+          "Accept": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "id": 1,
+          "name": "Jane Doe",
+          "email": "jane@example.com",
+          "active": true
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "matchers": [{"match": "type"}],
+              "combine": "AND"
+            },
+            "$.name": {
+              "matchers": [{"match": "type"}]
+            },
+            "$.email": {
+              "matchers": [{"match": "regex", "regex": "^[^@]+@[^@]+$"}]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "matchers": [{"match": "regex", "regex": "application/json.*"}]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  }
+}
