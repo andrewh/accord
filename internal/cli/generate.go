@@ -3,7 +3,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/andrewh/accord/internal/generate"
 	"github.com/spf13/cobra"
@@ -42,19 +41,20 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	outputs, err := generate.FromFile(args[0], opts)
 	if err != nil {
 		cmd.SilenceUsage = true
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(cmd.ErrOrStderr(), err) //nolint:errcheck
 		return err
 	}
 
 	if len(outputs) == 0 {
-		fmt.Fprintln(os.Stderr, "no interactions generated (check --endpoints filter)")
+		fmt.Fprintln(cmd.ErrOrStderr(), "no interactions generated (check --endpoints filter)") //nolint:errcheck
 		return nil
 	}
 
 	if genDryRun {
+		stdout := cmd.OutOrStdout()
 		for _, out := range outputs {
-			fmt.Printf("# %s\n", out.Filename)
-			fmt.Println(string(out.YAML))
+			fmt.Fprintf(stdout, "# %s\n", out.Filename)    //nolint:errcheck
+			fmt.Fprintln(stdout, string(out.YAML))          //nolint:errcheck
 		}
 		return nil
 	}
@@ -64,8 +64,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	stdout := cmd.OutOrStdout()
 	for _, out := range outputs {
-		fmt.Printf("wrote %s/%s\n", genOutputDir, out.Filename)
+		fmt.Fprintf(stdout, "wrote %s/%s\n", genOutputDir, out.Filename) //nolint:errcheck
 	}
 	return nil
 }

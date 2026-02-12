@@ -3,7 +3,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/andrewh/accord/internal/convert"
 	"github.com/spf13/cobra"
@@ -34,36 +33,38 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	}
 
 	hasErrors := false
+	stdout := cmd.OutOrStdout()
+	stderr := cmd.ErrOrStderr()
 	for _, path := range args {
 		outputs, warnings, err := convert.FromFile(path, opts)
 		if err != nil {
 			cmd.SilenceUsage = true
-			fmt.Fprintf(os.Stderr, "error: %s: %v\n", path, err)
+			fmt.Fprintf(stderr, "error: %s: %v\n", path, err) //nolint:errcheck
 			hasErrors = true
 			continue
 		}
 
 		for _, w := range warnings {
-			fmt.Fprintf(os.Stderr, "warning: %s: %s\n", w.File, w.Message)
+			fmt.Fprintf(stderr, "warning: %s: %s\n", w.File, w.Message) //nolint:errcheck
 		}
 
 		if convertDryRun {
 			for _, out := range outputs {
-				fmt.Printf("# %s\n", out.Filename)
-				fmt.Println(string(out.YAML))
+				fmt.Fprintf(stdout, "# %s\n", out.Filename)    //nolint:errcheck
+				fmt.Fprintln(stdout, string(out.YAML))          //nolint:errcheck
 			}
 			continue
 		}
 
 		if err := convert.WriteFiles(outputs); err != nil {
 			cmd.SilenceUsage = true
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			fmt.Fprintf(stderr, "error: %v\n", err) //nolint:errcheck
 			hasErrors = true
 			continue
 		}
 
 		for _, out := range outputs {
-			fmt.Printf("wrote %s/%s\n", convertOutputDir, out.Filename)
+			fmt.Fprintf(stdout, "wrote %s/%s\n", convertOutputDir, out.Filename) //nolint:errcheck
 		}
 	}
 
