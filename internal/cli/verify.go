@@ -3,7 +3,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/andrewh/accord/internal/contract"
@@ -35,32 +34,33 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	for _, path := range args {
 		result, err := contract.ParseFile(path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err)
 			hasFailures = true
 			continue
 		}
 
 		c := result.Contract
-		fmt.Printf("Verifying %s (%s -> %s)\n", path, c.Consumer.Name, c.Provider.Name)
+		out := cmd.OutOrStdout()
+		fmt.Fprintf(out, "Verifying %s (%s -> %s)\n", path, c.Consumer.Name, c.Provider.Name)
 
 		results := verify.Verify(c, providerURL, time.Duration(timeout)*time.Second)
 		for _, r := range results {
 			hasWarnings := len(r.Failures) > 0 && r.Passed
 			switch {
 			case r.Passed && !hasWarnings:
-				fmt.Printf("  PASS  %s\n", r.Interaction)
+				fmt.Fprintf(out, "  PASS  %s\n", r.Interaction)
 			case r.Passed && hasWarnings:
-				fmt.Printf("  WARN  %s\n", r.Interaction)
+				fmt.Fprintf(out, "  WARN  %s\n", r.Interaction)
 				for _, f := range r.Failures {
-					fmt.Printf("        [warning] %s\n", f)
+					fmt.Fprintf(out, "        [warning] %s\n", f)
 				}
 			default:
-				fmt.Printf("  FAIL  %s\n", r.Interaction)
+				fmt.Fprintf(out, "  FAIL  %s\n", r.Interaction)
 				for _, f := range r.Failures {
 					if f.Severity == verify.SeverityWarning {
-						fmt.Printf("        [warning] %s\n", f)
+						fmt.Fprintf(out, "        [warning] %s\n", f)
 					} else {
-						fmt.Printf("        %s\n", f)
+						fmt.Fprintf(out, "        %s\n", f)
 					}
 				}
 				hasFailures = true
@@ -72,6 +72,6 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("verification failed")
 	}
-	fmt.Println("\nAll interactions passed.")
+	fmt.Fprintln(cmd.OutOrStdout(), "\nAll interactions passed.")
 	return nil
 }

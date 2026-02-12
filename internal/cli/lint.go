@@ -3,7 +3,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/andrewh/accord/internal/contract"
 	"github.com/andrewh/accord/internal/lint"
@@ -29,14 +28,14 @@ func runLint(cmd *cobra.Command, args []string) error {
 	for _, path := range args {
 		result, err := contract.ParseFile(path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err)
 			hasErrors = true
 			continue
 		}
 
 		diags := linter.Lint(result.Contract, result.Node)
 		for _, d := range diags {
-			fmt.Println(lint.FormatDiagnostic(path, d))
+			fmt.Fprintln(cmd.OutOrStdout(), lint.FormatDiagnostic(path, d))
 		}
 		if lint.HasErrors(diags) {
 			hasErrors = true
