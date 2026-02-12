@@ -3,6 +3,7 @@ package contract
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -488,5 +489,160 @@ func TestApplyRuleUnknownType(t *testing.T) {
 	err := ApplyRule(MatchingRule{Match: "unknown"}, "a", "b")
 	if err == nil {
 		t.Error("expected error for unknown match type, got nil")
+	}
+}
+
+func TestToFloat64(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   any
+		want    float64
+		wantErr bool
+	}{
+		{"int", int(42), 42.0, false},
+		{"int8", int8(8), 8.0, false},
+		{"int16", int16(16), 16.0, false},
+		{"int32", int32(32), 32.0, false},
+		{"int64", int64(64), 64.0, false},
+		{"uint", uint(10), 10.0, false},
+		{"uint8", uint8(8), 8.0, false},
+		{"uint16", uint16(16), 16.0, false},
+		{"uint32", uint32(32), 32.0, false},
+		{"uint64", uint64(64), 64.0, false},
+		{"float32", float32(3.14), float64(float32(3.14)), false},
+		{"float64", float64(2.718), 2.718, false},
+		{"string is error", "hello", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := toFloat64(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got %v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("toFloat64(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormaliseNumeric(t *testing.T) {
+	tests := []struct {
+		name string
+		input any
+		want  any
+	}{
+		{"int", int(42), float64(42)},
+		{"int8", int8(8), float64(8)},
+		{"int16", int16(16), float64(16)},
+		{"int32", int32(32), float64(32)},
+		{"int64", int64(64), float64(64)},
+		{"uint", uint(10), float64(10)},
+		{"uint8", uint8(8), float64(8)},
+		{"uint16", uint16(16), float64(16)},
+		{"uint32", uint32(32), float64(32)},
+		{"uint64", uint64(64), float64(64)},
+		{"float32", float32(3.14), float64(float32(3.14))},
+		{"float64 passthrough", float64(2.718), float64(2.718)},
+		{"string passthrough", "hello", "hello"},
+		{"nil passthrough", nil, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normaliseNumeric(tt.input)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("normaliseNumeric(%v) = %v (%T), want %v (%T)", tt.input, got, got, tt.want, tt.want)
+			}
+		})
+	}
+}
+
+func TestGeneralType(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  string
+	}{
+		{"string", "hello", "string"},
+		{"bool", true, "bool"},
+		{"int", 42, "number"},
+		{"float64", 3.14, "number"},
+		{"nil", nil, "null"},
+		{"object", map[string]any{"key": "val"}, "object"},
+		{"array", []any{1, 2, 3}, "array"},
+		{"custom type", struct{}{}, "struct {}"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := generalType(tt.input)
+			if got != tt.want {
+				t.Errorf("generalType(%v) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolvePathInResponseHeaderNotFound(t *testing.T) {
+	headers := map[string]string{"Content-Type": "application/json"}
+	_, err := ResolvePathInResponse("$.headers.X-Missing", 0, headers, nil)
+	if err == nil {
+		t.Error("expected error for missing header, got nil")
+	}
+}
+
+func TestResolvePathInResponseBody(t *testing.T) {
+	body := map[string]any{"name": "Jane"}
+	got, err := ResolvePathInResponse("$.body.name", 0, nil, body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "Jane" {
+		t.Errorf("got %v, want %q", got, "Jane")
+	}
+}
+
+func TestResolvePathInResponseUnsupported(t *testing.T) {
+	_, err := ResolvePathInResponse("$.unknown", 0, nil, nil)
+	if err == nil {
+		t.Error("expected error for unsupported path, got nil")
+	}
+}
+
+func TestResolvePathEdgeCases(t *testing.T) {
+	body := map[string]any{
+		"id":   123,
+		"name": "text",
+	}
+
+	tests := []struct {
+		name    string
+		path    string
+		data    any
+		wantErr string
+	}{
+		{"no $. prefix", "body.id", body, "path must start with"},
+		{"not a $.body path", "$.status", body, "only handles $.body paths"},
+		{"indexed non-array", "$.body.name[0]", body, "expected array"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ResolvePath(tt.path, tt.data)
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q does not contain %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }
