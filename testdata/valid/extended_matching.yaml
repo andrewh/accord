@@ -1,0 +1,43 @@
+accord: "0.1"
+consumer:
+  name: "dashboard"
+provider:
+  name: "analytics-api"
+interactions:
+  - description: "get analytics summary"
+    request:
+      method: GET
+      path: /analytics/summary
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        total_events: 1500
+        max_score: 95.5
+        description: "Monthly analytics summary report"
+        last_updated: "2024-01-15T10:30:00Z"
+        period: "monthly"
+        data:
+          id: 1
+    matching_rules:
+      "$.body.total_events":
+        match: min
+        min: 0
+      "$.body.max_score":
+        match: max
+        max: 100
+      "$.body.description":
+        match: includes
+        includes: "summary"
+      "$.body.last_updated":
+        match: datetime
+      "$.body.period":
+        match: enum
+        values:
+          - "daily"
+          - "weekly"
+          - "monthly"
+          - "yearly"
+      "$.body.data.id":
+        match: not_null

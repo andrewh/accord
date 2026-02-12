@@ -64,8 +64,13 @@ type MatchingRules map[string]MatchingRule
 
 // MatchingRule defines how a response field should be compared.
 type MatchingRule struct {
-	Match string `yaml:"match"`
-	Regex string `yaml:"regex,omitempty"`
+	Match    string   `yaml:"match"`
+	Regex    string   `yaml:"regex,omitempty"`
+	Min      *float64 `yaml:"min,omitempty"`
+	Max      *float64 `yaml:"max,omitempty"`
+	Values   []string `yaml:"values,omitempty"`
+	Format   string   `yaml:"format,omitempty"`
+	Includes string   `yaml:"includes,omitempty"`
 }
 
 // ParseResult holds both the structured contract and the raw YAML node tree.

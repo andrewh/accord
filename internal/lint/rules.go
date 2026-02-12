@@ -17,6 +17,8 @@ var validMethods = map[string]bool{
 
 var validMatchTypes = map[string]bool{
 	"exact": true, "type": true, "regex": true,
+	"min": true, "max": true, "includes": true,
+	"datetime": true, "enum": true, "not_null": true,
 }
 
 // validBracket matches well-formed bracket syntax: [digits] or [*].
@@ -237,6 +239,50 @@ func ruleMatchingRules(c *contract.Contract, node *yaml.Node) []Diagnostic {
 						Path: prefix + "[" + path + "].regex",
 					})
 				}
+			}
+
+			if rule.Match == "min" && rule.Min == nil {
+				ixNode := findInteractionNode(node, i)
+				line, col := matchingRuleKeyPosition(ixNode, path)
+				diags = append(diags, Diagnostic{
+					Severity: Error,
+					Message:  "min field is required when match is \"min\"",
+					Line:     line, Column: col,
+					Path: prefix + "[" + path + "].min",
+				})
+			}
+
+			if rule.Match == "max" && rule.Max == nil {
+				ixNode := findInteractionNode(node, i)
+				line, col := matchingRuleKeyPosition(ixNode, path)
+				diags = append(diags, Diagnostic{
+					Severity: Error,
+					Message:  "max field is required when match is \"max\"",
+					Line:     line, Column: col,
+					Path: prefix + "[" + path + "].max",
+				})
+			}
+
+			if rule.Match == "enum" && len(rule.Values) == 0 {
+				ixNode := findInteractionNode(node, i)
+				line, col := matchingRuleKeyPosition(ixNode, path)
+				diags = append(diags, Diagnostic{
+					Severity: Error,
+					Message:  "values field is required when match is \"enum\"",
+					Line:     line, Column: col,
+					Path: prefix + "[" + path + "].values",
+				})
+			}
+
+			if rule.Match == "includes" && rule.Includes == "" {
+				ixNode := findInteractionNode(node, i)
+				line, col := matchingRuleKeyPosition(ixNode, path)
+				diags = append(diags, Diagnostic{
+					Severity: Error,
+					Message:  "includes field is required when match is \"includes\"",
+					Line:     line, Column: col,
+					Path: prefix + "[" + path + "].includes",
+				})
 			}
 		}
 	}

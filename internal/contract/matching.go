@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // ResolvePath extracts a value from a nested map using dot-notation (e.g. "$.body.address.city").
@@ -111,6 +112,74 @@ func MatchRegex(pattern string, actual any) error {
 	return nil
 }
 
+// MatchMin checks that the numeric value of actual is >= min.
+func MatchMin(min float64, actual any) error {
+	f, err := toFloat64(actual)
+	if err != nil {
+		return fmt.Errorf("cannot compare non-numeric value %v (%T) against min", actual, actual)
+	}
+	if f < min {
+		return fmt.Errorf("value %v is less than minimum %v", actual, min)
+	}
+	return nil
+}
+
+// MatchMax checks that the numeric value of actual is <= max.
+func MatchMax(max float64, actual any) error {
+	f, err := toFloat64(actual)
+	if err != nil {
+		return fmt.Errorf("cannot compare non-numeric value %v (%T) against max", actual, actual)
+	}
+	if f > max {
+		return fmt.Errorf("value %v is greater than maximum %v", actual, max)
+	}
+	return nil
+}
+
+// MatchIncludes checks that the string representation of actual contains substr.
+func MatchIncludes(substr string, actual any) error {
+	s := fmt.Sprintf("%v", actual)
+	if !strings.Contains(s, substr) {
+		return fmt.Errorf("value %q does not contain %q", s, substr)
+	}
+	return nil
+}
+
+// MatchDatetime checks that actual is a string matching the given time format.
+// If format is empty, defaults to RFC3339.
+func MatchDatetime(format string, actual any) error {
+	s, ok := actual.(string)
+	if !ok {
+		return fmt.Errorf("expected string for datetime, got %T", actual)
+	}
+	if format == "" {
+		format = time.RFC3339
+	}
+	if _, err := time.Parse(format, s); err != nil {
+		return fmt.Errorf("value %q does not match datetime format %q: %w", s, format, err)
+	}
+	return nil
+}
+
+// MatchEnum checks that the string representation of actual is one of the allowed values.
+func MatchEnum(values []string, actual any) error {
+	s := fmt.Sprintf("%v", actual)
+	for _, v := range values {
+		if s == v {
+			return nil
+		}
+	}
+	return fmt.Errorf("value %q is not one of %v", s, values)
+}
+
+// MatchNotNull checks that actual is not nil.
+func MatchNotNull(actual any) error {
+	if actual == nil {
+		return fmt.Errorf("expected non-null value, got nil")
+	}
+	return nil
+}
+
 // ApplyRule applies a matching rule to compare expected and actual values.
 // If the rule has no match type set, defaults to exact matching.
 func ApplyRule(rule MatchingRule, expected, actual any) error {
@@ -126,8 +195,52 @@ func ApplyRule(rule MatchingRule, expected, actual any) error {
 		return MatchType(expected, actual)
 	case "regex":
 		return MatchRegex(rule.Regex, actual)
+	case "min":
+		return MatchMin(*rule.Min, actual)
+	case "max":
+		return MatchMax(*rule.Max, actual)
+	case "includes":
+		return MatchIncludes(rule.Includes, actual)
+	case "datetime":
+		return MatchDatetime(rule.Format, actual)
+	case "enum":
+		return MatchEnum(rule.Values, actual)
+	case "not_null":
+		return MatchNotNull(actual)
 	default:
 		return fmt.Errorf("unknown match type: %q", match)
+	}
+}
+
+// toFloat64 converts a numeric value to float64.
+func toFloat64(v any) (float64, error) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), nil
+	case int8:
+		return float64(n), nil
+	case int16:
+		return float64(n), nil
+	case int32:
+		return float64(n), nil
+	case int64:
+		return float64(n), nil
+	case uint:
+		return float64(n), nil
+	case uint8:
+		return float64(n), nil
+	case uint16:
+		return float64(n), nil
+	case uint32:
+		return float64(n), nil
+	case uint64:
+		return float64(n), nil
+	case float32:
+		return float64(n), nil
+	case float64:
+		return n, nil
+	default:
+		return 0, fmt.Errorf("not a numeric type: %T", v)
 	}
 }
 

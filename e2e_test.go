@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2ELintValidFiles(t *testing.T) {
-	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml", "testdata/valid/array_matching.yaml", "testdata/valid/nfr_example.yaml")
+	cmd := exec.Command(binaryPath, "lint", "testdata/valid/user_service.yaml", "testdata/valid/minimal.yaml", "testdata/valid/array_matching.yaml", "testdata/valid/nfr_example.yaml", "testdata/valid/extended_matching.yaml")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
@@ -448,6 +448,82 @@ interactions:
 	}
 	if !strings.Contains(out, "invalid severity") {
 		t.Errorf("expected severity error, got: %s", out)
+	}
+}
+
+func TestE2EVerifyNewMatchTypes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"count":      42,
+			"score":      7.5,
+			"message":    "hello world",
+			"created_at": "2024-06-15T14:00:00Z",
+			"status":     "active",
+			"id":         999,
+		})
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "contract.yaml")
+	contractYAML := `
+accord: "0.1"
+consumer:
+  name: "test-consumer"
+provider:
+  name: "test-provider"
+interactions:
+  - description: "verify new match types"
+    request:
+      method: GET
+      path: /data
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body:
+        count: 10
+        score: 5.0
+        message: "placeholder"
+        created_at: "2024-01-01T00:00:00Z"
+        status: "pending"
+        id: 1
+    matching_rules:
+      "$.body.count":
+        match: min
+        min: 1
+      "$.body.score":
+        match: max
+        max: 100
+      "$.body.message":
+        match: includes
+        includes: "world"
+      "$.body.created_at":
+        match: datetime
+      "$.body.status":
+        match: enum
+        values:
+          - "active"
+          - "inactive"
+          - "pending"
+      "$.body.id":
+        match: not_null
+`
+	if err := os.WriteFile(contractPath, []byte(contractYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binaryPath, "verify", "--provider-url", server.URL, contractPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "PASS") {
+		t.Errorf("expected PASS in output, got: %s", out)
 	}
 }
 
