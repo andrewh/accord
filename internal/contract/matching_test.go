@@ -463,6 +463,27 @@ func TestApplyRuleNewTypes(t *testing.T) {
 	}
 }
 
+func TestApplyRuleMissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name string
+		rule MatchingRule
+	}{
+		{"min without min value", MatchingRule{Match: "min"}},
+		{"max without max value", MatchingRule{Match: "max"}},
+		{"includes without includes value", MatchingRule{Match: "includes"}},
+		{"enum without values", MatchingRule{Match: "enum"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ApplyRule(tt.rule, nil, 42)
+			if err == nil {
+				t.Error("expected error for missing required field, got nil")
+			}
+		})
+	}
+}
+
 func TestApplyRuleUnknownType(t *testing.T) {
 	err := ApplyRule(MatchingRule{Match: "unknown"}, "a", "b")
 	if err == nil {

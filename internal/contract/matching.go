@@ -196,14 +196,26 @@ func ApplyRule(rule MatchingRule, expected, actual any) error {
 	case "regex":
 		return MatchRegex(rule.Regex, actual)
 	case "min":
+		if rule.Min == nil {
+			return fmt.Errorf("match type %q requires a min value", match)
+		}
 		return MatchMin(*rule.Min, actual)
 	case "max":
+		if rule.Max == nil {
+			return fmt.Errorf("match type %q requires a max value", match)
+		}
 		return MatchMax(*rule.Max, actual)
 	case "includes":
+		if rule.Includes == "" {
+			return fmt.Errorf("match type %q requires an includes value", match)
+		}
 		return MatchIncludes(rule.Includes, actual)
 	case "datetime":
 		return MatchDatetime(rule.Format, actual)
 	case "enum":
+		if len(rule.Values) == 0 {
+			return fmt.Errorf("match type %q requires a values list", match)
+		}
 		return MatchEnum(rule.Values, actual)
 	case "not_null":
 		return MatchNotNull(actual)
