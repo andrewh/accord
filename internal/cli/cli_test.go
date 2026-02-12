@@ -105,8 +105,18 @@ func TestLintMultipleFilesMixed(t *testing.T) {
 	if !strings.Contains(stderr, "nonexistent.yaml") {
 		t.Errorf("expected missing file error in stderr, got: %s", stderr)
 	}
-	if !strings.Contains(stdout, "consumer.name is required") {
-		t.Errorf("expected lint diagnostics in stdout, got: %s", stdout)
+	// Verify all diagnostics from the invalid file are still reported even
+	// when a missing file precedes it in the argument list.
+	for _, msg := range []string{
+		"consumer.name is required",
+		"provider.name is required",
+		"description is required",
+		"request.method is required",
+		"response.status is required",
+	} {
+		if !strings.Contains(stdout, msg) {
+			t.Errorf("expected stdout to contain %q, got:\n%s", msg, stdout)
+		}
 	}
 }
 
