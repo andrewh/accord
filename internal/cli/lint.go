@@ -28,14 +28,14 @@ func runLint(cmd *cobra.Command, args []string) error {
 	for _, path := range args {
 		result, err := contract.ParseFile(path)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err) //nolint:errcheck
 			hasErrors = true
 			continue
 		}
 
 		diags := linter.Lint(result.Contract, result.Node)
 		for _, d := range diags {
-			fmt.Fprintln(cmd.OutOrStdout(), lint.FormatDiagnostic(path, d))
+			fmt.Fprintln(cmd.OutOrStdout(), lint.FormatDiagnostic(path, d)) //nolint:errcheck
 		}
 		if lint.HasErrors(diags) {
 			hasErrors = true

@@ -34,33 +34,33 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	for _, path := range args {
 		result, err := contract.ParseFile(path)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err) //nolint:errcheck
 			hasFailures = true
 			continue
 		}
 
 		c := result.Contract
 		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "Verifying %s (%s -> %s)\n", path, c.Consumer.Name, c.Provider.Name)
+		fmt.Fprintf(out, "Verifying %s (%s -> %s)\n", path, c.Consumer.Name, c.Provider.Name) //nolint:errcheck
 
 		results := verify.Verify(c, providerURL, time.Duration(timeout)*time.Second)
 		for _, r := range results {
 			hasWarnings := len(r.Failures) > 0 && r.Passed
 			switch {
 			case r.Passed && !hasWarnings:
-				fmt.Fprintf(out, "  PASS  %s\n", r.Interaction)
+				fmt.Fprintf(out, "  PASS  %s\n", r.Interaction) //nolint:errcheck
 			case r.Passed && hasWarnings:
-				fmt.Fprintf(out, "  WARN  %s\n", r.Interaction)
+				fmt.Fprintf(out, "  WARN  %s\n", r.Interaction) //nolint:errcheck
 				for _, f := range r.Failures {
-					fmt.Fprintf(out, "        [warning] %s\n", f)
+					fmt.Fprintf(out, "        [warning] %s\n", f) //nolint:errcheck
 				}
 			default:
-				fmt.Fprintf(out, "  FAIL  %s\n", r.Interaction)
+				fmt.Fprintf(out, "  FAIL  %s\n", r.Interaction) //nolint:errcheck
 				for _, f := range r.Failures {
 					if f.Severity == verify.SeverityWarning {
-						fmt.Fprintf(out, "        [warning] %s\n", f)
+						fmt.Fprintf(out, "        [warning] %s\n", f) //nolint:errcheck
 					} else {
-						fmt.Fprintf(out, "        %s\n", f)
+						fmt.Fprintf(out, "        %s\n", f) //nolint:errcheck
 					}
 				}
 				hasFailures = true
@@ -72,6 +72,6 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("verification failed")
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "\nAll interactions passed.")
+	fmt.Fprintln(cmd.OutOrStdout(), "\nAll interactions passed.") //nolint:errcheck
 	return nil
 }
