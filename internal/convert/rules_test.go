@@ -280,6 +280,26 @@ func TestConvertMatchingRulesV3MultipleMatchersWarning(t *testing.T) {
 	}
 }
 
+func TestConvertMatchingRulesV3RootBodyPath(t *testing.T) {
+	raw := json.RawMessage(`{
+		"body": {
+			"$": {"matchers": [{"match": "type"}]}
+		}
+	}`)
+
+	rules, warnings := convertMatchingRulesV3(raw)
+
+	if len(rules) != 1 {
+		t.Fatalf("rules: got %d, want 1", len(rules))
+	}
+	if _, ok := rules["$.body"]; !ok {
+		t.Errorf("expected $.body key for root path, got keys: %v", keys(rules))
+	}
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+}
+
 func TestConvertMatchingRulesV2EmptyInput(t *testing.T) {
 	rules, warnings := convertMatchingRulesV2(nil)
 	if len(rules) != 0 {

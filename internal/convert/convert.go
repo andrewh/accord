@@ -123,7 +123,7 @@ func convertInteraction(ix PactInteraction, version int, file string) (contract.
 	}
 
 	// Convert query parameters.
-	query, qws := convertQuery(ix.Request, version, file, ix.Description)
+	query, qws := convertQuery(ix.Request, version, file)
 	warnings = append(warnings, qws...)
 
 	// Convert matching rules from the response.
@@ -186,7 +186,7 @@ func buildResponse(pr PactResponse) contract.Response {
 }
 
 // convertQuery converts Pact query parameters to Accord map format.
-func convertQuery(req PactRequest, version int, file, _ string) (map[string]string, []Warning) {
+func convertQuery(req PactRequest, version int, file string) (map[string]string, []Warning) {
 	if version >= 3 && req.QueryV3 != nil {
 		q, ws := convertV3Query(req.QueryV3)
 		for i := range ws {

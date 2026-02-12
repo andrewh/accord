@@ -174,6 +174,10 @@ func convertMatchingRulesV3(raw json.RawMessage) (contract.MatchingRules, []Warn
 func translateV3Path(category, fieldPath string) string {
 	switch category {
 	case "body":
+		// $ or $. alone means the whole body.
+		if fieldPath == "$" || fieldPath == "$." {
+			return "$.body"
+		}
 		// $.field -> $.body.field
 		if strings.HasPrefix(fieldPath, "$.") {
 			return "$.body." + fieldPath[2:]
