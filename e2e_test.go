@@ -651,3 +651,131 @@ func TestE2EGenerateNoArgs(t *testing.T) {
 		t.Fatal("expected non-zero exit with no arguments")
 	}
 }
+
+func TestE2EConvertDryRun(t *testing.T) {
+	cmd := exec.Command(binaryPath, "convert", "--dry-run", "testdata/pact/v2_basic.json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "accord:") {
+		t.Errorf("expected 'accord:' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "web-app") {
+		t.Errorf("expected consumer name in output, got: %s", out)
+	}
+	if !strings.Contains(out, "user-api") {
+		t.Errorf("expected provider name in output, got: %s", out)
+	}
+	if !strings.Contains(out, "web-app--user-api.yaml") {
+		t.Errorf("expected filename header in output, got: %s", out)
+	}
+}
+
+func TestE2EConvertV3DryRun(t *testing.T) {
+	cmd := exec.Command(binaryPath, "convert", "--dry-run", "testdata/pact/v3_with_matching.json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "$.body.id") {
+		t.Errorf("expected body matching rule path in output, got: %s", out)
+	}
+	if !strings.Contains(out, "match: type") {
+		t.Errorf("expected type matcher in output, got: %s", out)
+	}
+}
+
+func TestE2EConvertWriteFile(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command(binaryPath, "convert", "--output-dir", dir, "testdata/pact/v2_basic.json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	path := filepath.Join(dir, "web-app--user-api.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("expected output file to exist: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("expected non-empty output file")
+	}
+}
+
+func TestE2EConvertThenLint(t *testing.T) {
+	dir := t.TempDir()
+	convertCmd := exec.Command(binaryPath, "convert", "--output-dir", dir, "testdata/pact/v2_with_matching.json")
+	convertOutput, err := convertCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("convert failed: %v\noutput: %s", err, convertOutput)
+	}
+
+	contractPath := filepath.Join(dir, "web-app--user-api.yaml")
+	lintCmd := exec.Command(binaryPath, "lint", contractPath)
+	lintOutput, err := lintCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("lint failed on converted contract: %v\noutput: %s", err, lintOutput)
+	}
+	if len(lintOutput) != 0 {
+		t.Errorf("expected no lint output for converted contract, got: %s", lintOutput)
+	}
+}
+
+func TestE2EConvertWarnings(t *testing.T) {
+	cmd := exec.Command(binaryPath, "convert", "--dry-run", "testdata/pact/v3_unsupported.json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0 (warnings only), got error: %v\noutput: %s", err, output)
+	}
+
+	out := string(output)
+	if !strings.Contains(out, "warning:") {
+		t.Errorf("expected warnings in stderr, got: %s", out)
+	}
+	if !strings.Contains(out, "providerState") {
+		t.Errorf("expected providerStates warning, got: %s", out)
+	}
+	if !strings.Contains(out, "message") {
+		t.Errorf("expected messages warning, got: %s", out)
+	}
+}
+
+func TestE2EConvertMultipleFiles(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command(binaryPath, "convert", "--output-dir", dir, "testdata/pact/v2_basic.json", "testdata/pact/v3_basic.json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\noutput: %s", err, output)
+	}
+
+	// Both should produce the same filename (same consumer/provider).
+	path := filepath.Join(dir, "web-app--user-api.yaml")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected output file to exist: %v", err)
+	}
+}
+
+func TestE2EConvertMissingFile(t *testing.T) {
+	cmd := exec.Command(binaryPath, "convert", "nonexistent.json")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit for missing file")
+	}
+	if !strings.Contains(string(output), "nonexistent.json") {
+		t.Errorf("expected error to mention filename, got: %s", output)
+	}
+}
+
+func TestE2EConvertNoArgs(t *testing.T) {
+	cmd := exec.Command(binaryPath, "convert")
+	_, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit with no arguments")
+	}
+}
