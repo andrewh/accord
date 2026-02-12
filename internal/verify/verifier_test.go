@@ -836,6 +836,103 @@ func TestSeverityZeroValueIsError(t *testing.T) {
 	}
 }
 
+func TestVerifyWithNewMatchTypes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"count":      42,
+			"score":      7.5,
+			"message":    "hello world",
+			"created_at": "2024-01-15T10:30:00Z",
+			"status":     "active",
+			"id":         999,
+		})
+	}))
+	defer server.Close()
+
+	minVal := 1.0
+	maxVal := 100.0
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "new match types",
+				Request:     contract.Request{Method: "GET", Path: "/data"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"count":      10,
+						"score":      5.0,
+						"message":    "placeholder",
+						"created_at": "2024-01-01T00:00:00Z",
+						"status":     "pending",
+						"id":         1,
+					},
+				},
+				MatchingRules: contract.MatchingRules{
+					"$.body.count":      {Match: "min", Min: &minVal},
+					"$.body.score":      {Match: "max", Max: &maxVal},
+					"$.body.message":    {Match: "includes", Includes: "world"},
+					"$.body.created_at": {Match: "datetime"},
+					"$.body.status":     {Match: "enum", Values: []string{"active", "inactive", "pending"}},
+					"$.body.id":         {Match: "not_null"},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if !results[0].Passed {
+		t.Errorf("expected pass with new match types, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestVerifyNewMatchTypesFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]any{
+			"count":   0,
+			"message": "goodbye",
+			"status":  "deleted",
+		})
+	}))
+	defer server.Close()
+
+	minVal := 5.0
+
+	c := &contract.Contract{
+		Interactions: []contract.Interaction{
+			{
+				Description: "new match types failure",
+				Request:     contract.Request{Method: "GET", Path: "/data"},
+				Response: contract.Response{
+					Status: 200,
+					Body: map[string]any{
+						"count":   10,
+						"message": "placeholder",
+						"status":  "pending",
+					},
+				},
+				MatchingRules: contract.MatchingRules{
+					"$.body.count":   {Match: "min", Min: &minVal},
+					"$.body.message": {Match: "includes", Includes: "world"},
+					"$.body.status":  {Match: "enum", Values: []string{"active", "inactive"}},
+				},
+			},
+		},
+	}
+
+	results := Verify(c, server.URL)
+	if results[0].Passed {
+		t.Error("expected failure for new match types")
+	}
+	if len(results[0].Failures) < 3 {
+		t.Errorf("expected at least 3 failures, got %d: %v", len(results[0].Failures), results[0].Failures)
+	}
+}
+
 func TestVerifySpecificIndexOverridesWildcard(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

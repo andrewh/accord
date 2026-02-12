@@ -250,6 +250,240 @@ func TestApplyRule(t *testing.T) {
 	}
 }
 
+func TestMatchMin(t *testing.T) {
+	tests := []struct {
+		name   string
+		min    float64
+		actual any
+		wantOK bool
+	}{
+		{"int above min", 5, 10, true},
+		{"int below min", 5, 3, false},
+		{"int at boundary", 5, 5, true},
+		{"float64 above min", 1.5, 2.0, true},
+		{"float64 below min", 1.5, 1.0, false},
+		{"float64 at boundary", 1.5, 1.5, true},
+		{"non-numeric", 5, "hello", false},
+		{"zero min", 0, 0, true},
+		{"negative value above negative min", -10, -5, true},
+		{"negative value below negative min", -10, -15, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := MatchMin(tt.min, tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestMatchMax(t *testing.T) {
+	tests := []struct {
+		name   string
+		max    float64
+		actual any
+		wantOK bool
+	}{
+		{"int below max", 10, 5, true},
+		{"int above max", 10, 15, false},
+		{"int at boundary", 10, 10, true},
+		{"float64 below max", 2.0, 1.5, true},
+		{"float64 above max", 2.0, 2.5, false},
+		{"float64 at boundary", 2.0, 2.0, true},
+		{"non-numeric", 5, "hello", false},
+		{"zero max", 0, 0, true},
+		{"negative value below negative max", -5, -10, true},
+		{"negative value above negative max", -10, -5, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := MatchMax(tt.max, tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestMatchIncludes(t *testing.T) {
+	tests := []struct {
+		name   string
+		substr string
+		actual any
+		wantOK bool
+	}{
+		{"string contains substring", "world", "hello world", true},
+		{"string does not contain", "xyz", "hello world", false},
+		{"exact match", "hello", "hello", true},
+		{"non-string actual contains", "42", 42, true},
+		{"bool contains", "true", true, true},
+		{"empty substring always matches", "", "anything", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := MatchIncludes(tt.substr, tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestMatchDatetime(t *testing.T) {
+	tests := []struct {
+		name   string
+		format string
+		actual any
+		wantOK bool
+	}{
+		{"RFC3339 default", "", "2024-01-15T10:30:00Z", true},
+		{"RFC3339 with offset", "", "2024-01-15T10:30:00+01:00", true},
+		{"invalid datetime default", "", "not-a-date", false},
+		{"custom format", "2006-01-02", "2024-01-15", true},
+		{"custom format mismatch", "2006-01-02", "15/01/2024", false},
+		{"non-string actual", "", 12345, false},
+		{"date only format", "02/01/2006", "15/01/2024", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := MatchDatetime(tt.format, tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestMatchEnum(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []string
+		actual any
+		wantOK bool
+	}{
+		{"member string", []string{"active", "inactive", "pending"}, "active", true},
+		{"non-member string", []string{"active", "inactive", "pending"}, "deleted", false},
+		{"numeric stringified", []string{"1", "2", "3"}, 2, true},
+		{"bool stringified", []string{"true", "false"}, true, true},
+		{"empty values", []string{}, "anything", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := MatchEnum(tt.values, tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestMatchNotNull(t *testing.T) {
+	tests := []struct {
+		name   string
+		actual any
+		wantOK bool
+	}{
+		{"non-nil string", "hello", true},
+		{"non-nil int", 42, true},
+		{"non-nil bool", false, true},
+		{"nil value", nil, false},
+		{"empty string is not null", "", true},
+		{"zero is not null", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := MatchNotNull(tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestApplyRuleNewTypes(t *testing.T) {
+	minVal := 5.0
+	maxVal := 100.0
+
+	tests := []struct {
+		name     string
+		rule     MatchingRule
+		expected any
+		actual   any
+		wantOK   bool
+	}{
+		{"min pass", MatchingRule{Match: "min", Min: &minVal}, nil, 10, true},
+		{"min fail", MatchingRule{Match: "min", Min: &minVal}, nil, 3, false},
+		{"max pass", MatchingRule{Match: "max", Max: &maxVal}, nil, 50, true},
+		{"max fail", MatchingRule{Match: "max", Max: &maxVal}, nil, 150, false},
+		{"includes pass", MatchingRule{Match: "includes", Includes: "world"}, nil, "hello world", true},
+		{"includes fail", MatchingRule{Match: "includes", Includes: "xyz"}, nil, "hello world", false},
+		{"datetime pass", MatchingRule{Match: "datetime"}, nil, "2024-01-15T10:30:00Z", true},
+		{"datetime fail", MatchingRule{Match: "datetime"}, nil, "not-a-date", false},
+		{"enum pass", MatchingRule{Match: "enum", Values: []string{"a", "b", "c"}}, nil, "b", true},
+		{"enum fail", MatchingRule{Match: "enum", Values: []string{"a", "b", "c"}}, nil, "z", false},
+		{"not_null pass", MatchingRule{Match: "not_null"}, nil, "something", true},
+		{"not_null fail", MatchingRule{Match: "not_null"}, nil, nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ApplyRule(tt.rule, tt.expected, tt.actual)
+			if tt.wantOK && err != nil {
+				t.Errorf("expected match, got error: %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Errorf("expected mismatch, got match")
+			}
+		})
+	}
+}
+
+func TestApplyRuleMissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name string
+		rule MatchingRule
+	}{
+		{"min without min value", MatchingRule{Match: "min"}},
+		{"max without max value", MatchingRule{Match: "max"}},
+		{"includes without includes value", MatchingRule{Match: "includes"}},
+		{"enum without values", MatchingRule{Match: "enum"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ApplyRule(tt.rule, nil, 42)
+			if err == nil {
+				t.Error("expected error for missing required field, got nil")
+			}
+		})
+	}
+}
+
 func TestApplyRuleUnknownType(t *testing.T) {
 	err := ApplyRule(MatchingRule{Match: "unknown"}, "a", "b")
 	if err == nil {

@@ -563,6 +563,242 @@ interactions:
 	requireDiagnostic(t, diags, Error, "threshold must be > 0")
 }
 
+func TestRuleMatchingRuleMinValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        count: 5
+    matching_rules:
+      "$.body.count":
+        match: min
+        min: 1
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleMatchingRuleMinMissing(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        count: 5
+    matching_rules:
+      "$.body.count":
+        match: min
+`)
+	requireDiagnostic(t, diags, Error, "min field is required")
+}
+
+func TestRuleMatchingRuleMaxValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        count: 5
+    matching_rules:
+      "$.body.count":
+        match: max
+        max: 100
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleMatchingRuleMaxMissing(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        count: 5
+    matching_rules:
+      "$.body.count":
+        match: max
+`)
+	requireDiagnostic(t, diags, Error, "max field is required")
+}
+
+func TestRuleMatchingRuleEnumValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        status: "active"
+    matching_rules:
+      "$.body.status":
+        match: enum
+        values:
+          - "active"
+          - "inactive"
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleMatchingRuleEnumMissing(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        status: "active"
+    matching_rules:
+      "$.body.status":
+        match: enum
+`)
+	requireDiagnostic(t, diags, Error, "values field is required")
+}
+
+func TestRuleMatchingRuleIncludesValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        message: "hello world"
+    matching_rules:
+      "$.body.message":
+        match: includes
+        includes: "world"
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleMatchingRuleIncludesMissing(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        message: "hello world"
+    matching_rules:
+      "$.body.message":
+        match: includes
+`)
+	requireDiagnostic(t, diags, Error, "includes field is required")
+}
+
+func TestRuleMatchingRuleDatetimeValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        created_at: "2024-01-15T10:30:00Z"
+    matching_rules:
+      "$.body.created_at":
+        match: datetime
+`)
+	requireNoDiagnostics(t, diags)
+}
+
+func TestRuleMatchingRuleNotNullValid(t *testing.T) {
+	diags := lintYAML(t, `
+accord: "0.1"
+consumer:
+  name: "a"
+provider:
+  name: "b"
+interactions:
+  - description: "test"
+    request:
+      method: GET
+      path: /test
+    response:
+      status: 200
+      body:
+        id: 1
+    matching_rules:
+      "$.body.id":
+        match: not_null
+`)
+	requireNoDiagnostics(t, diags)
+}
+
 func TestRuleNFRInvalidSeverity(t *testing.T) {
 	diags := lintYAML(t, `
 accord: "0.1"
