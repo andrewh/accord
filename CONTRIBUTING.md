@@ -34,4 +34,4 @@ Please do **not** open a public issue for security vulnerabilities. See
 ## Licence
 
 By contributing, you agree that your contributions will be licensed under the
-[MIT licence](LICENSE).
+[Apache 2.0 licence](LICENSE).
