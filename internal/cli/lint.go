@@ -18,8 +18,7 @@ var lintCmd = &cobra.Command{
 	Short: "Validate contract files",
 	Long:  "Validates one or more Accord contract files and reports errors and warnings.",
 	Example: `  accord lint contracts/user-api.yaml
-  accord lint contracts/*.yaml
-  accord lint contracts/`,
+  accord lint contracts/*.yaml`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runLint,
 }
