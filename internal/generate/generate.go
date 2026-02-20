@@ -23,9 +23,9 @@ type Options struct {
 
 // Output holds a generated contract with its serialised YAML and filename.
 type Output struct {
-	Contract *contract.Contract
-	YAML     []byte
-	Filename string
+	Contract  *contract.Contract
+	YAML      []byte
+	Filename  string
 	OutputDir string
 }
 

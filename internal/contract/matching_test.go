@@ -67,9 +67,9 @@ func TestResolvePathArrayIndex(t *testing.T) {
 		{"$.body.users[1].email", "bob@example.com", false},
 		{"$.body.tags[0]", "go", false},
 		{"$.body.tags[1]", "testing", false},
-		{"$.body.users[5]", nil, true},             // out of bounds
-		{"$.body.tags[0].nested", nil, true},        // traversing into scalar
-		{"$.body.users[*]", nil, true},              // wildcard not supported in ResolvePath
+		{"$.body.users[5]", nil, true},       // out of bounds
+		{"$.body.tags[0].nested", nil, true}, // traversing into scalar
+		{"$.body.users[*]", nil, true},       // wildcard not supported in ResolvePath
 	}
 
 	for _, tt := range tests {
@@ -166,8 +166,8 @@ func TestMatchType(t *testing.T) {
 		{"string to string", "hello", "world", true},
 		{"int to int", 42, 99, true},
 		{"float to float", 1.5, 2.5, true},
-		{"int to float", 42, 42.0, true},       // both numeric
-		{"float to int", 1.5, 2, true},          // both numeric
+		{"int to float", 42, 42.0, true}, // both numeric
+		{"float to int", 1.5, 2, true},   // both numeric
 		{"bool to bool", true, false, true},
 		{"string to int", "hello", 42, false},
 		{"nil to nil", nil, nil, true},
@@ -535,7 +535,7 @@ func TestToFloat64(t *testing.T) {
 
 func TestNormaliseNumeric(t *testing.T) {
 	tests := []struct {
-		name string
+		name  string
 		input any
 		want  any
 	}{

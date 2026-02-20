@@ -11,12 +11,12 @@ import (
 
 // PactMatcher represents a single Pact matcher entry.
 type PactMatcher struct {
-	Match   string   `json:"match"`
-	Regex   string   `json:"regex,omitempty"`
-	Value   string   `json:"value,omitempty"`
-	Min     *float64 `json:"min,omitempty"`
-	Max     *float64 `json:"max,omitempty"`
-	Format  string   `json:"format,omitempty"`
+	Match  string   `json:"match"`
+	Regex  string   `json:"regex,omitempty"`
+	Value  string   `json:"value,omitempty"`
+	Min    *float64 `json:"min,omitempty"`
+	Max    *float64 `json:"max,omitempty"`
+	Format string   `json:"format,omitempty"`
 }
 
 // pactV3MatcherSet holds matchers and combine mode for a v3 matching rule.

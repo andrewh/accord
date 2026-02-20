@@ -1,8 +1,15 @@
 version: 2
 
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
 builds:
   - main: ./cmd/accord/
     binary: accord
+    env:
+      - CGO_ENABLED=0
     ldflags:
       - -s -w -X github.com/andrewh/accord/internal/cli.Version={{.Version}}
     goos:
@@ -14,14 +21,19 @@ builds:
       - arm64
 
 archives:
-  - format: tar.gz
+  - formats: ['tar.gz']
     name_template: "accord_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ['zip']
 
 checksum:
   name_template: "checksums.txt"
 
 changelog:
   sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'

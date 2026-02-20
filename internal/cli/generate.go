@@ -53,8 +53,8 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if genDryRun {
 		stdout := cmd.OutOrStdout()
 		for _, out := range outputs {
-			fmt.Fprintf(stdout, "# %s\n", out.Filename)    //nolint:errcheck
-			fmt.Fprintln(stdout, string(out.YAML))          //nolint:errcheck
+			fmt.Fprintf(stdout, "# %s\n", out.Filename) //nolint:errcheck
+			fmt.Fprintln(stdout, string(out.YAML))      //nolint:errcheck
 		}
 		return nil
 	}

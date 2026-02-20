@@ -201,10 +201,10 @@ func ruleMatchingRules(c *contract.Contract, node *yaml.Node) []Diagnostic {
 			}
 
 			if diag, ok := validateBrackets(path, prefix, findInteractionNode(node, i)); !ok {
-			diags = append(diags, diag)
-		}
+				diags = append(diags, diag)
+			}
 
-		matchType := rule.Match
+			matchType := rule.Match
 			if matchType == "" {
 				matchType = "exact"
 			}
