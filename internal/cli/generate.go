@@ -27,8 +27,11 @@ var generateCmd = &cobra.Command{
 	Use:   "generate <openapi-spec>",
 	Short: "Generate contract files from an OpenAPI spec",
 	Long:  "Reads an OpenAPI specification and generates starter Accord contract files with sensible defaults and matching rules.",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runGenerate,
+	Example: `  accord generate openapi.yaml
+  accord generate --consumer checkout-service --output-dir contracts/ api/spec.yaml
+  accord generate --endpoints "/users/*" --dry-run openapi.yaml`,
+	Args: cobra.ExactArgs(1),
+	RunE: runGenerate,
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {

@@ -24,11 +24,19 @@ var verifyCmd = &cobra.Command{
 	Use:   "verify <files...>",
 	Short: "Verify contracts against a provider",
 	Long:  "Sends contract interactions to a running provider and verifies the responses match.",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  runVerify,
+	Example: `  accord verify --provider-url http://localhost:8080 contracts/user-api.yaml
+  accord verify --provider-url http://localhost:8080 --timeout 60 contracts/*.yaml`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: runVerify,
 }
 
 func runVerify(cmd *cobra.Command, args []string) error {
+	if err := verify.ValidateProviderURL(providerURL); err != nil {
+		cmd.SilenceUsage = true
+		fmt.Fprintln(cmd.ErrOrStderr(), err) //nolint:errcheck
+		return err
+	}
+
 	hasFailures := false
 
 	for _, path := range args {

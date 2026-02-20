@@ -17,8 +17,11 @@ var lintCmd = &cobra.Command{
 	Use:   "lint <files...>",
 	Short: "Validate contract files",
 	Long:  "Validates one or more Accord contract files and reports errors and warnings.",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  runLint,
+	Example: `  accord lint contracts/user-api.yaml
+  accord lint contracts/*.yaml
+  accord lint contracts/`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: runLint,
 }
 
 func runLint(cmd *cobra.Command, args []string) error {
