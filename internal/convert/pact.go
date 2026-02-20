@@ -11,7 +11,7 @@ import (
 type PactFile struct {
 	Consumer     PactParty         `json:"consumer"`
 	Provider     PactParty         `json:"provider"`
-	Interactions []PactInteraction  `json:"interactions"`
+	Interactions []PactInteraction `json:"interactions"`
 	Messages     []json.RawMessage `json:"messages,omitempty"`
 	Metadata     PactMetadata      `json:"metadata"`
 }
@@ -40,12 +40,12 @@ type PactInteraction struct {
 
 // PactRequest describes a Pact HTTP request.
 type PactRequest struct {
-	Method  string            `json:"method"`
-	Path    string            `json:"path"`
-	Headers map[string]string `json:"headers,omitempty"`
-	QueryV2 string            // populated by custom unmarshal for v2 string queries
+	Method  string              `json:"method"`
+	Path    string              `json:"path"`
+	Headers map[string]string   `json:"headers,omitempty"`
+	QueryV2 string              // populated by custom unmarshal for v2 string queries
 	QueryV3 map[string][]string // populated by custom unmarshal for v3 map queries
-	Body    any               `json:"body,omitempty"`
+	Body    any                 `json:"body,omitempty"`
 }
 
 // UnmarshalJSON handles the polymorphic query field (string in v2, map in v3).

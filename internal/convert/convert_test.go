@@ -275,8 +275,8 @@ func TestV2QueryStringConversion(t *testing.T) {
 
 func TestV3QueryMapConversion(t *testing.T) {
 	input := map[string][]string{
-		"page":   {"1"},
-		"tags":   {"a", "b", "c"},
+		"page": {"1"},
+		"tags": {"a", "b", "c"},
 	}
 
 	got, warnings := convertV3Query(input)

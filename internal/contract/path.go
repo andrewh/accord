@@ -11,7 +11,7 @@ import (
 // optionally with an array index or wildcard suffix.
 type PathSegment struct {
 	Field    string
-	Index    int  // -1 means no index
+	Index    int // -1 means no index
 	Wildcard bool
 }
 

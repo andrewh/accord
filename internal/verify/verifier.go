@@ -22,7 +22,7 @@ var indexPattern = regexp.MustCompile(`\[\d+\]`)
 type Severity int
 
 const (
-	SeverityError   Severity = iota
+	SeverityError Severity = iota
 	SeverityWarning
 )
 

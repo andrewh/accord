@@ -7,20 +7,20 @@ import (
 
 func TestParseSegment(t *testing.T) {
 	tests := []struct {
-		input    string
-		want     PathSegment
-		wantErr  bool
+		input   string
+		want    PathSegment
+		wantErr bool
 	}{
 		{"name", PathSegment{Field: "name", Index: -1}, false},
 		{"users[0]", PathSegment{Field: "users", Index: 0}, false},
 		{"users[42]", PathSegment{Field: "users", Index: 42}, false},
 		{"items[*]", PathSegment{Field: "items", Wildcard: true, Index: -1}, false},
-		{"[0]", PathSegment{}, true},          // no field name
-		{"users[]", PathSegment{}, true},      // empty brackets
-		{"users[-1]", PathSegment{}, true},    // negative index
-		{"users[abc]", PathSegment{}, true},   // non-numeric, non-wildcard
-		{"users[0", PathSegment{}, true},      // unclosed bracket
-		{"users0]", PathSegment{}, true},      // no opening bracket
+		{"[0]", PathSegment{}, true},        // no field name
+		{"users[]", PathSegment{}, true},    // empty brackets
+		{"users[-1]", PathSegment{}, true},  // negative index
+		{"users[abc]", PathSegment{}, true}, // non-numeric, non-wildcard
+		{"users[0", PathSegment{}, true},    // unclosed bracket
+		{"users0]", PathSegment{}, true},    // no opening bracket
 	}
 
 	for _, tt := range tests {
