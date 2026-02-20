@@ -56,6 +56,32 @@ func (f Failure) String() string {
 	return fmt.Sprintf("%s: %s (expected %s, got %s)", f.Field, f.Message, f.Expected, f.Actual)
 }
 
+// ValidateProviderURL checks that a provider URL has a valid scheme and host.
+func ValidateProviderURL(rawURL string) error {
+	if rawURL == "" {
+		return fmt.Errorf("empty provider URL")
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid provider URL %q: %w", rawURL, err)
+	}
+
+	if parsed.Scheme == "" || !strings.Contains(rawURL, "://") {
+		return fmt.Errorf("invalid provider URL %q: missing scheme (did you mean %q?)", rawURL, "http://"+rawURL)
+	}
+
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("invalid provider URL %q: unsupported scheme %q (must be http or https)", rawURL, parsed.Scheme)
+	}
+
+	if parsed.Host == "" {
+		return fmt.Errorf("invalid provider URL %q: missing host", rawURL)
+	}
+
+	return nil
+}
+
 // Verify runs all interactions in a contract against a live provider.
 func Verify(c *contract.Contract, providerURL string, timeout time.Duration) []Result {
 	var results []Result

@@ -335,6 +335,28 @@ interactions:
 	}
 }
 
+func TestVerifyInvalidProviderURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr string
+	}{
+		{name: "missing scheme", url: "localhost:8080", wantErr: "missing scheme"},
+		{name: "ftp scheme", url: "ftp://files.example.com", wantErr: "unsupported scheme"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := executeCommand(t, "verify", "--provider-url", tt.url, "../../testdata/valid/minimal.yaml")
+			if err == nil {
+				t.Fatal("expected error for invalid provider URL")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want it to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestVerifyMissingFile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
