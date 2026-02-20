@@ -1,3 +1,4 @@
 /accord
 /build/
 __pycache__/
+.claude/
