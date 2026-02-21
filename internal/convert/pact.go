@@ -40,12 +40,13 @@ type PactInteraction struct {
 
 // PactRequest describes a Pact HTTP request.
 type PactRequest struct {
-	Method  string              `json:"method"`
-	Path    string              `json:"path"`
-	Headers map[string]string   `json:"headers,omitempty"`
-	QueryV2 string              // populated by custom unmarshal for v2 string queries
-	QueryV3 map[string][]string // populated by custom unmarshal for v3 map queries
-	Body    any                 `json:"body,omitempty"`
+	Method     string              `json:"method"`
+	Path       string              `json:"path"`
+	Headers    map[string]string   `json:"headers,omitempty"`
+	QueryV2    string              // populated by custom unmarshal for v2 string queries
+	QueryV3    map[string][]string // populated by custom unmarshal for v3 map queries
+	Body       any                 `json:"body,omitempty"`
+	Generators json.RawMessage     `json:"generators,omitempty"`
 }
 
 // UnmarshalJSON handles the polymorphic query field (string in v2, map in v3).

@@ -48,11 +48,12 @@ func FromFile(path string, opts Options) ([]Output, []Warning, error) {
 	version := detectVersion(pf)
 	var warnings []Warning
 
-	// Warn about unsupported features.
-	if len(pf.Messages) > 0 {
+	// Warn about unsupported message interactions.
+	for _, raw := range pf.Messages {
+		desc := messageDescription(raw)
 		warnings = append(warnings, Warning{
 			File:    path,
-			Message: "Pact messages are not supported and were skipped",
+			Message: fmt.Sprintf("message %q: message interactions are not supported and were skipped", desc),
 		})
 	}
 
@@ -83,6 +84,8 @@ func FromFile(path string, opts Options) ([]Output, []Warning, error) {
 		Filename:  filename,
 		OutputDir: opts.OutputDir,
 	}}
+
+	warnings = append(warnings, summariseSkipped(warnings, path)...)
 
 	return outputs, warnings, nil
 }
@@ -115,7 +118,7 @@ func convertInteraction(ix PactInteraction, version int, file string) (contract.
 	}
 
 	// Warn about generators.
-	if len(ix.Response.Generators) > 0 {
+	if len(ix.Response.Generators) > 0 || len(ix.Request.Generators) > 0 {
 		warnings = append(warnings, Warning{
 			File:    file,
 			Message: fmt.Sprintf("interaction %q: generators are not supported and were skipped", ix.Description),
@@ -248,6 +251,53 @@ func convertV3Query(qm map[string][]string) (map[string]string, []Warning) {
 		}
 	}
 	return result, warnings
+}
+
+// messageDescription extracts the description from a raw Pact message JSON.
+func messageDescription(raw json.RawMessage) string {
+	var m struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil || m.Description == "" {
+		return "(unknown)"
+	}
+	return m.Description
+}
+
+// summariseSkipped appends a summary warning when multiple unsupported features were skipped.
+func summariseSkipped(warnings []Warning, file string) []Warning {
+	var providerStates, generators, messages int
+	for _, w := range warnings {
+		switch {
+		case strings.Contains(w.Message, "providerStates are not supported"):
+			providerStates++
+		case strings.Contains(w.Message, "generators are not supported"):
+			generators++
+		case strings.Contains(w.Message, "message interactions are not supported"):
+			messages++
+		}
+	}
+
+	total := providerStates + generators + messages
+	if total < 2 {
+		return nil
+	}
+
+	var parts []string
+	if providerStates > 0 {
+		parts = append(parts, fmt.Sprintf("%d provider state(s)", providerStates))
+	}
+	if generators > 0 {
+		parts = append(parts, fmt.Sprintf("%d generator(s)", generators))
+	}
+	if messages > 0 {
+		parts = append(parts, fmt.Sprintf("%d message(s)", messages))
+	}
+
+	return []Warning{{
+		File:    file,
+		Message: fmt.Sprintf("summary: skipped unsupported features: %s", strings.Join(parts, ", ")),
+	}}
 }
 
 var nonAlphanumeric = regexp.MustCompile(`[^a-z0-9]+`)

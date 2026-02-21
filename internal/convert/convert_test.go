@@ -164,6 +164,205 @@ func TestFromFileV3Unsupported(t *testing.T) {
 	if !hasMessages {
 		t.Errorf("expected messages warning, got: %v", warnMessages)
 	}
+
+	hasSummary := false
+	for _, w := range warnMessages {
+		if strings.Contains(w, "summary:") {
+			hasSummary = true
+		}
+	}
+	if !hasSummary {
+		t.Errorf("expected summary warning, got: %v", warnMessages)
+	}
+}
+
+func TestProviderStateV2Warning(t *testing.T) {
+	pact := []byte(`{
+		"consumer": {"name": "a"},
+		"provider": {"name": "b"},
+		"interactions": [{
+			"description": "get user",
+			"providerState": "user exists",
+			"request": {"method": "GET", "path": "/"},
+			"response": {"status": 200}
+		}],
+		"metadata": {"pactSpecification": {"version": "2.0.0"}}
+	}`)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "v2_ps.json")
+	if err := os.WriteFile(path, pact, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, warnings, err := FromFile(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "providerStates") && strings.Contains(w.Message, "get user") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected providerStates warning with interaction description, got: %v", warningStrings(warnings))
+	}
+}
+
+func TestRequestGeneratorsWarning(t *testing.T) {
+	pact := []byte(`{
+		"consumer": {"name": "a"},
+		"provider": {"name": "b"},
+		"interactions": [{
+			"description": "create user",
+			"request": {
+				"method": "POST",
+				"path": "/users",
+				"generators": {"body": {"$.id": {"type": "RandomInt"}}}
+			},
+			"response": {"status": 201}
+		}],
+		"metadata": {"pactSpecification": {"version": "3.0.0"}}
+	}`)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "req_gen.json")
+	if err := os.WriteFile(path, pact, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, warnings, err := FromFile(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "generators") && strings.Contains(w.Message, "create user") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected generators warning for request generators, got: %v", warningStrings(warnings))
+	}
+}
+
+func TestMessageDescriptionInWarning(t *testing.T) {
+	pact := []byte(`{
+		"consumer": {"name": "a"},
+		"provider": {"name": "b"},
+		"interactions": [],
+		"messages": [
+			{"description": "user created event", "contents": {}},
+			{"description": "order placed event", "contents": {}}
+		],
+		"metadata": {"pactSpecification": {"version": "3.0.0"}}
+	}`)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "msgs.json")
+	if err := os.WriteFile(path, pact, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, warnings, err := FromFile(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	warnMessages := warningStrings(warnings)
+	hasUserCreated := false
+	hasOrderPlaced := false
+	for _, w := range warnMessages {
+		if strings.Contains(w, "user created event") {
+			hasUserCreated = true
+		}
+		if strings.Contains(w, "order placed event") {
+			hasOrderPlaced = true
+		}
+	}
+	if !hasUserCreated {
+		t.Errorf("expected warning for 'user created event', got: %v", warnMessages)
+	}
+	if !hasOrderPlaced {
+		t.Errorf("expected warning for 'order placed event', got: %v", warnMessages)
+	}
+}
+
+func TestSummaryWithMultipleUnsupportedFeatures(t *testing.T) {
+	pact := []byte(`{
+		"consumer": {"name": "a"},
+		"provider": {"name": "b"},
+		"interactions": [{
+			"description": "get user",
+			"providerStates": [{"name": "user exists"}],
+			"request": {"method": "GET", "path": "/"},
+			"response": {
+				"status": 200,
+				"generators": {"body": {"$.id": {"type": "RandomInt"}}}
+			}
+		}],
+		"messages": [{"description": "event", "contents": {}}],
+		"metadata": {"pactSpecification": {"version": "3.0.0"}}
+	}`)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "summary.json")
+	if err := os.WriteFile(path, pact, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, warnings, err := FromFile(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	warnMessages := warningStrings(warnings)
+	hasSummary := false
+	for _, w := range warnMessages {
+		if strings.Contains(w, "summary:") &&
+			strings.Contains(w, "provider state") &&
+			strings.Contains(w, "generator") &&
+			strings.Contains(w, "message") {
+			hasSummary = true
+		}
+	}
+	if !hasSummary {
+		t.Errorf("expected summary with all three feature counts, got: %v", warnMessages)
+	}
+}
+
+func TestNoSummaryForSingleWarning(t *testing.T) {
+	pact := []byte(`{
+		"consumer": {"name": "a"},
+		"provider": {"name": "b"},
+		"interactions": [{
+			"description": "get user",
+			"providerStates": [{"name": "user exists"}],
+			"request": {"method": "GET", "path": "/"},
+			"response": {"status": 200}
+		}],
+		"metadata": {"pactSpecification": {"version": "3.0.0"}}
+	}`)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "single.json")
+	if err := os.WriteFile(path, pact, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, warnings, err := FromFile(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "summary:") {
+			t.Errorf("did not expect summary for single unsupported feature, got: %v", warningStrings(warnings))
+		}
+	}
 }
 
 func TestFromFileFilename(t *testing.T) {
