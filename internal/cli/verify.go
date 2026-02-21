@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/andrewh/accord/internal/contract"
+	"github.com/andrewh/accord/internal/lint"
 	"github.com/andrewh/accord/internal/verify"
 	"github.com/spf13/cobra"
 )
@@ -37,9 +38,16 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	hasFailures := false
+	paths, err := resolveFilePaths(args)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
 
-	for _, path := range args {
+	hasFailures := false
+	linter := lint.New()
+
+	for _, path := range paths {
 		result, err := contract.ParseFile(path)
 		if err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err) //nolint:errcheck
@@ -47,8 +55,17 @@ func runVerify(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		c := result.Contract
 		out := cmd.OutOrStdout()
+		diags := linter.Lint(result.Contract, result.Node)
+		for _, d := range diags {
+			fmt.Fprintln(out, lint.FormatDiagnostic(path, d)) //nolint:errcheck
+		}
+		if lint.HasErrors(diags) {
+			hasFailures = true
+			continue
+		}
+
+		c := result.Contract
 		fmt.Fprintf(out, "Verifying %s (%s -> %s)\n", path, c.Consumer.Name, c.Provider.Name) //nolint:errcheck
 
 		results := verify.Verify(c, providerURL, time.Duration(timeout)*time.Second)

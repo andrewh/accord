@@ -120,6 +120,116 @@ func TestLintMultipleFilesMixed(t *testing.T) {
 	}
 }
 
+func TestLintGlobPattern(t *testing.T) {
+	_, _, err := executeCommand(t, "lint", "../../testdata/valid/*.yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLintRecursiveGlob(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "nested", "deep")
+	if err := os.MkdirAll(sub, 0755); err != nil {
+		t.Fatal(err)
+	}
+	contract := `
+accord: "0.1"
+consumer:
+  name: test-consumer
+provider:
+  name: test-provider
+interactions:
+  - description: "glob test"
+    request:
+      method: GET
+      path: /health
+    response:
+      status: 200
+`
+	for _, name := range []string{
+		filepath.Join(dir, "a.yaml"),
+		filepath.Join(dir, "nested", "b.yaml"),
+		filepath.Join(sub, "c.yml"),
+	} {
+		if err := os.WriteFile(name, []byte(contract), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, _, err := executeCommand(t, "lint", filepath.Join(dir, "**", "*.yaml"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout != "" {
+		t.Errorf("expected no diagnostics, got: %s", stdout)
+	}
+}
+
+func TestLintDirectoryArgument(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(sub, 0755); err != nil {
+		t.Fatal(err)
+	}
+	contract := `
+accord: "0.1"
+consumer:
+  name: test-consumer
+provider:
+  name: test-provider
+interactions:
+  - description: "dir test"
+    request:
+      method: GET
+      path: /health
+    response:
+      status: 200
+`
+	for _, name := range []string{
+		filepath.Join(dir, "a.yaml"),
+		filepath.Join(sub, "b.yml"),
+	} {
+		if err := os.WriteFile(name, []byte(contract), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, _, err := executeCommand(t, "lint", dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout != "" {
+		t.Errorf("expected no diagnostics, got: %s", stdout)
+	}
+}
+
+func TestLintGlobNoMatch(t *testing.T) {
+	dir := t.TempDir()
+	pattern := filepath.Join(dir, "*.yaml")
+	_, _, err := executeCommand(t, "lint", pattern)
+	if err == nil {
+		t.Fatal("expected error for no-match glob")
+	}
+	if !strings.Contains(err.Error(), "no files matched") {
+		t.Errorf("expected 'no files matched' error, got: %v", err)
+	}
+}
+
+func TestLintDirectoryNoYAML(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := executeCommand(t, "lint", dir)
+	if err == nil {
+		t.Fatal("expected error for directory with no YAML files")
+	}
+	if !strings.Contains(err.Error(), "no .yaml or .yml files") {
+		t.Errorf("expected 'no .yaml or .yml' error, got: %v", err)
+	}
+}
+
 // --- generate ----------------------------------------------------------------
 
 func TestGenerateDryRun(t *testing.T) {
@@ -354,6 +464,45 @@ func TestVerifyInvalidProviderURL(t *testing.T) {
 				t.Errorf("error = %q, want it to contain %q", err.Error(), tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestVerifyLintErrorSkipsVerification(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("provider should not be contacted when contract has lint errors")
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	stdout, _, err := executeCommand(t, "verify", "--provider-url", server.URL, "../../testdata/invalid/bad_matching.yaml")
+	if err == nil {
+		t.Fatal("expected error when contract has lint errors")
+	}
+	if !strings.Contains(stdout, "unknown match type") {
+		t.Errorf("expected lint error in output, got:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "Verifying") {
+		t.Error("should not print 'Verifying' header when lint errors prevent verification")
+	}
+}
+
+func TestVerifyLintWarningProceeds(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.Write([]byte(`{"id":1}`)) //nolint:errcheck
+	}))
+	defer server.Close()
+
+	stdout, _, err := executeCommand(t, "verify", "--provider-url", server.URL, "../../testdata/invalid/warning_only.yaml")
+	if err != nil {
+		t.Fatalf("expected no error when contract has only lint warnings, got: %v", err)
+	}
+	if !strings.Contains(stdout, "should start with") {
+		t.Errorf("expected lint warning in output, got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "Verifying") {
+		t.Errorf("expected verification to proceed after lint warnings, got:\n%s", stdout)
 	}
 }
 

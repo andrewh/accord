@@ -1,0 +1,20 @@
+accord: "0.1"
+
+consumer:
+  name: "client"
+
+provider:
+  name: "server"
+
+interactions:
+  - description: "get item"
+    request:
+      method: GET
+      path: /items/1
+    response:
+      status: 200
+      body:
+        id: 1
+    matching_rules:
+      "body.id":
+        match: type
