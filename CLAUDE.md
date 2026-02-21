@@ -31,6 +31,7 @@ internal/
   generate/         # OpenAPI to Accord contract generation
   openapi/          # OpenAPI spec parsing
 docs/               # Getting started guide, CLI reference
+  demos/            # Executable showboat demo documents
 testdata/           # Valid and invalid contract fixtures
 ```
 
