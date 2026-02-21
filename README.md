@@ -13,6 +13,12 @@ in CI — just a single binary and contract files.
 ## Install
 
 ```sh
+brew install andrewh/tap/accord
+```
+
+Or with Go:
+
+```sh
 go install github.com/andrewh/accord/cmd/accord@latest
 ```
 
