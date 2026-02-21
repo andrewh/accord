@@ -299,3 +299,26 @@ interactions:
 		t.Errorf("expected NFR to be nil when omitted, got %v", result.Contract.Interactions[0].NFR)
 	}
 }
+
+func TestSeverityString(t *testing.T) {
+	tests := []struct {
+		severity Severity
+		want     string
+	}{
+		{SeverityError, "error"},
+		{SeverityWarning, "warning"},
+		{Severity(99), "unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.severity.String(); got != tt.want {
+			t.Errorf("Severity(%d).String() = %q, want %q", tt.severity, got, tt.want)
+		}
+	}
+}
+
+func TestSeverityZeroValueIsError(t *testing.T) {
+	var s Severity
+	if s != SeverityError {
+		t.Errorf("zero value Severity = %d, want SeverityError (0)", s)
+	}
+}

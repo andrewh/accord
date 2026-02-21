@@ -9,24 +9,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Severity indicates whether a diagnostic is an error or warning.
-type Severity int
+// Severity, Error, and Warning are re-exported from the contract package
+// so that lint rule implementations and callers can use them directly.
+type Severity = contract.Severity
 
 const (
-	Error Severity = iota
-	Warning
+	Error   = contract.SeverityError
+	Warning = contract.SeverityWarning
 )
-
-func (s Severity) String() string {
-	switch s {
-	case Error:
-		return "error"
-	case Warning:
-		return "warning"
-	default:
-		return "unknown"
-	}
-}
 
 // Diagnostic represents a single lint finding.
 type Diagnostic struct {

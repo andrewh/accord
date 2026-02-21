@@ -77,16 +77,12 @@ func runVerify(cmd *cobra.Command, args []string) error {
 			case r.Passed && hasWarnings:
 				fmt.Fprintf(out, "  WARN  %s\n", r.Interaction) //nolint:errcheck
 				for _, f := range r.Failures {
-					fmt.Fprintf(out, "        [warning] %s\n", f) //nolint:errcheck
+					fmt.Fprintf(out, "        [%s] %s\n", f.Severity, f) //nolint:errcheck
 				}
 			default:
 				fmt.Fprintf(out, "  FAIL  %s\n", r.Interaction) //nolint:errcheck
 				for _, f := range r.Failures {
-					if f.Severity == verify.SeverityWarning {
-						fmt.Fprintf(out, "        [warning] %s\n", f) //nolint:errcheck
-					} else {
-						fmt.Fprintf(out, "        %s\n", f) //nolint:errcheck
-					}
+					fmt.Fprintf(out, "        [%s] %s\n", f.Severity, f) //nolint:errcheck
 				}
 				hasFailures = true
 			}
