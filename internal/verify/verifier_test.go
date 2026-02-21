@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -974,6 +975,42 @@ func TestVerifySpecificIndexOverridesWildcard(t *testing.T) {
 	// items[1].id should use wildcard type (99 is number like 1, pass)
 	if !results[0].Passed {
 		t.Errorf("expected pass, got failures: %v", results[0].Failures)
+	}
+}
+
+func TestValidateProviderURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr string
+	}{
+		{name: "valid http", url: "http://localhost:8080"},
+		{name: "valid https", url: "https://api.example.com"},
+		{name: "valid with path", url: "http://localhost:8080/api"},
+		{name: "empty", url: "", wantErr: "empty provider URL"},
+		{name: "missing scheme", url: "localhost:8080", wantErr: `missing scheme (did you mean "http://localhost:8080"?)`},
+		{name: "missing scheme with path", url: "localhost:8080/api", wantErr: `missing scheme (did you mean "http://localhost:8080/api"?)`},
+		{name: "missing scheme no port", url: "example.com", wantErr: `missing scheme (did you mean "http://example.com"?)`},
+		{name: "ftp scheme", url: "ftp://files.example.com", wantErr: `unsupported scheme "ftp" (must be http or https)`},
+		{name: "missing host", url: "http://", wantErr: "missing host"},
+		{name: "trailing slash stripped", url: "http://localhost:8080/"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateProviderURL(tt.url)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want it to contain %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }
 

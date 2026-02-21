@@ -23,8 +23,11 @@ var convertCmd = &cobra.Command{
 	Use:   "convert <pact-files...>",
 	Short: "Convert Pact contracts to Accord YAML",
 	Long:  "Reads Pact v2 or v3 JSON contract files and converts them to Accord YAML format.",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  runConvert,
+	Example: `  accord convert pacts/user-service.json
+  accord convert --output-dir contracts/ pacts/*.json
+  accord convert --dry-run pacts/user-service.json`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: runConvert,
 }
 
 func runConvert(cmd *cobra.Command, args []string) error {
