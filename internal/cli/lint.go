@@ -18,16 +18,24 @@ var lintCmd = &cobra.Command{
 	Short: "Validate contract files",
 	Long:  "Validates one or more Accord contract files and reports errors and warnings.",
 	Example: `  accord lint contracts/user-api.yaml
-  accord lint contracts/*.yaml`,
+  accord lint contracts/*.yaml
+  accord lint "contracts/**/*.yaml"
+  accord lint contracts/`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runLint,
 }
 
 func runLint(cmd *cobra.Command, args []string) error {
+	paths, err := resolveFilePaths(args)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	linter := lint.New()
 	hasErrors := false
 
-	for _, path := range args {
+	for _, path := range paths {
 		result, err := contract.ParseFile(path)
 		if err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err) //nolint:errcheck
