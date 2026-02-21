@@ -14,10 +14,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// WarningKind categorises conversion warnings for programmatic use.
+type WarningKind int
+
+const (
+	WarningOther WarningKind = iota
+	WarningProviderState
+	WarningGenerators
+	WarningMessageInteraction
+)
+
 // Warning represents a non-fatal issue found during conversion.
 type Warning struct {
 	File    string
 	Message string
+	Kind    WarningKind
 }
 
 // Options configures the Pact-to-Accord conversion.
@@ -54,6 +65,7 @@ func FromFile(path string, opts Options) ([]Output, []Warning, error) {
 		warnings = append(warnings, Warning{
 			File:    path,
 			Message: fmt.Sprintf("message %q: message interactions are not supported and were skipped", desc),
+			Kind:    WarningMessageInteraction,
 		})
 	}
 
@@ -114,6 +126,7 @@ func convertInteraction(ix PactInteraction, version int, file string) (contract.
 		warnings = append(warnings, Warning{
 			File:    file,
 			Message: fmt.Sprintf("interaction %q: providerStates are not supported and were skipped", ix.Description),
+			Kind:    WarningProviderState,
 		})
 	}
 
@@ -122,6 +135,7 @@ func convertInteraction(ix PactInteraction, version int, file string) (contract.
 		warnings = append(warnings, Warning{
 			File:    file,
 			Message: fmt.Sprintf("interaction %q: generators are not supported and were skipped", ix.Description),
+			Kind:    WarningGenerators,
 		})
 	}
 
@@ -268,12 +282,12 @@ func messageDescription(raw json.RawMessage) string {
 func summariseSkipped(warnings []Warning, file string) []Warning {
 	var providerStates, generators, messages int
 	for _, w := range warnings {
-		switch {
-		case strings.Contains(w.Message, "providerStates are not supported"):
+		switch w.Kind {
+		case WarningProviderState:
 			providerStates++
-		case strings.Contains(w.Message, "generators are not supported"):
+		case WarningGenerators:
 			generators++
-		case strings.Contains(w.Message, "message interactions are not supported"):
+		case WarningMessageInteraction:
 			messages++
 		}
 	}
