@@ -45,12 +45,7 @@ func resolveFilePaths(args []string) ([]string, error) {
 		}
 
 		info, err := os.Stat(arg)
-		if err != nil {
-			paths = append(paths, arg)
-			continue
-		}
-
-		if !info.IsDir() {
+		if err != nil || !info.IsDir() {
 			paths = append(paths, arg)
 			continue
 		}
@@ -73,5 +68,13 @@ func resolveFilePaths(args []string) ([]string, error) {
 		}
 		paths = append(paths, found...)
 	}
-	return paths, nil
+	unique := make([]string, 0, len(paths))
+	seen := make(map[string]struct{})
+	for _, p := range paths {
+		if _, exists := seen[p]; !exists {
+			unique = append(unique, p)
+			seen[p] = struct{}{}
+		}
+	}
+	return unique, nil
 }

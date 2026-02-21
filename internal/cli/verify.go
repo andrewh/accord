@@ -38,10 +38,16 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	paths, err := resolveFilePaths(args)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	hasFailures := false
 	linter := lint.New()
 
-	for _, path := range args {
+	for _, path := range paths {
 		result, err := contract.ParseFile(path)
 		if err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "%s: %v\n", path, err) //nolint:errcheck
