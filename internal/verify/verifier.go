@@ -18,12 +18,13 @@ import (
 
 var indexPattern = regexp.MustCompile(`\[\d+\]`)
 
-// Severity indicates whether a verification failure is an error or warning.
-type Severity int
+// Severity, SeverityError, and SeverityWarning are re-exported from the
+// contract package so that callers can reference them via the verify package.
+type Severity = contract.Severity
 
 const (
-	SeverityError Severity = iota
-	SeverityWarning
+	SeverityError   = contract.SeverityError
+	SeverityWarning = contract.SeverityWarning
 )
 
 // Result holds the outcome of verifying a single interaction.

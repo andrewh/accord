@@ -14,10 +14,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// WarningKind categorises conversion warnings for programmatic use.
+type WarningKind int
+
+const (
+	WarningOther WarningKind = iota
+	WarningProviderState
+	WarningGenerators
+	WarningMessageInteraction
+)
+
 // Warning represents a non-fatal issue found during conversion.
 type Warning struct {
 	File    string
 	Message string
+	Kind    WarningKind
 }
 
 // Options configures the Pact-to-Accord conversion.
@@ -48,11 +59,13 @@ func FromFile(path string, opts Options) ([]Output, []Warning, error) {
 	version := detectVersion(pf)
 	var warnings []Warning
 
-	// Warn about unsupported features.
-	if len(pf.Messages) > 0 {
+	// Warn about unsupported message interactions.
+	for _, raw := range pf.Messages {
+		desc := messageDescription(raw)
 		warnings = append(warnings, Warning{
 			File:    path,
-			Message: "Pact messages are not supported and were skipped",
+			Message: fmt.Sprintf("message %q: message interactions are not supported and were skipped", desc),
+			Kind:    WarningMessageInteraction,
 		})
 	}
 
@@ -84,6 +97,8 @@ func FromFile(path string, opts Options) ([]Output, []Warning, error) {
 		OutputDir: opts.OutputDir,
 	}}
 
+	warnings = append(warnings, summariseSkipped(warnings, path)...)
+
 	return outputs, warnings, nil
 }
 
@@ -111,14 +126,16 @@ func convertInteraction(ix PactInteraction, version int, file string) (contract.
 		warnings = append(warnings, Warning{
 			File:    file,
 			Message: fmt.Sprintf("interaction %q: providerStates are not supported and were skipped", ix.Description),
+			Kind:    WarningProviderState,
 		})
 	}
 
 	// Warn about generators.
-	if len(ix.Response.Generators) > 0 {
+	if len(ix.Response.Generators) > 0 || len(ix.Request.Generators) > 0 {
 		warnings = append(warnings, Warning{
 			File:    file,
 			Message: fmt.Sprintf("interaction %q: generators are not supported and were skipped", ix.Description),
+			Kind:    WarningGenerators,
 		})
 	}
 
@@ -248,6 +265,53 @@ func convertV3Query(qm map[string][]string) (map[string]string, []Warning) {
 		}
 	}
 	return result, warnings
+}
+
+// messageDescription extracts the description from a raw Pact message JSON.
+func messageDescription(raw json.RawMessage) string {
+	var m struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil || m.Description == "" {
+		return "(unknown)"
+	}
+	return m.Description
+}
+
+// summariseSkipped appends a summary warning when multiple unsupported features were skipped.
+func summariseSkipped(warnings []Warning, file string) []Warning {
+	var providerStates, generators, messages int
+	for _, w := range warnings {
+		switch w.Kind {
+		case WarningProviderState:
+			providerStates++
+		case WarningGenerators:
+			generators++
+		case WarningMessageInteraction:
+			messages++
+		}
+	}
+
+	total := providerStates + generators + messages
+	if total < 2 {
+		return nil
+	}
+
+	var parts []string
+	if providerStates > 0 {
+		parts = append(parts, fmt.Sprintf("%d provider state(s)", providerStates))
+	}
+	if generators > 0 {
+		parts = append(parts, fmt.Sprintf("%d generator(s)", generators))
+	}
+	if messages > 0 {
+		parts = append(parts, fmt.Sprintf("%d message(s)", messages))
+	}
+
+	return []Warning{{
+		File:    file,
+		Message: fmt.Sprintf("summary: skipped unsupported features: %s", strings.Join(parts, ", ")),
+	}}
 }
 
 var nonAlphanumeric = regexp.MustCompile(`[^a-z0-9]+`)

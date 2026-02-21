@@ -400,6 +400,9 @@ func TestVerifyFail(t *testing.T) {
 	if !strings.Contains(stdout, "health check") {
 		t.Errorf("expected interaction description in output, got:\n%s", stdout)
 	}
+	if !strings.Contains(stdout, "[error]") {
+		t.Errorf("expected [error] prefix on failure, got:\n%s", stdout)
+	}
 }
 
 func TestVerifyWarn(t *testing.T) {

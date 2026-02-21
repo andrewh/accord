@@ -8,6 +8,25 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Severity indicates whether a diagnostic is an error or warning.
+type Severity int
+
+const (
+	SeverityError Severity = iota
+	SeverityWarning
+)
+
+func (s Severity) String() string {
+	switch s {
+	case SeverityError:
+		return "error"
+	case SeverityWarning:
+		return "warning"
+	default:
+		return "unknown"
+	}
+}
+
 // Contract represents a complete Accord contract file.
 type Contract struct {
 	Accord       string        `yaml:"accord"`
