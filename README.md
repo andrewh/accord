@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/andrewh/accord)](https://goreportcard.com/report/github.com/andrewh/accord)
 [![Go Reference](https://pkg.go.dev/badge/github.com/andrewh/accord.svg)](https://pkg.go.dev/github.com/andrewh/accord)
 
-Simple contract testing at scale.
+Simple contract testing.
 
 Consumer-driven contracts using plain YAML files, distributed through existing
 mechanisms (git, CI artifacts, package registries). Zero external dependencies
